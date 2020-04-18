@@ -69,6 +69,7 @@ namespace OsEngine.Robots
             result.Add("PriceChannelVolatility");
             result.Add("RsiTrade");
             result.Add("RviTrade");
+            result.Add("BollingerTrend");
 
             List<string> resultTrue = new List<string>();
 
@@ -249,6 +250,10 @@ namespace OsEngine.Robots
             if (nameClass == "PairTraderSpreadSma")
             {
                 bot = new PairTraderSpreadSma(name, startProgram);
+            }
+            if (nameClass == "BollingerTrend")
+            {
+                bot = new BollingerTrend(name, startProgram);
             }
 
 
