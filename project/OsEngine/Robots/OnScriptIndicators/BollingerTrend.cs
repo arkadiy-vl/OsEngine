@@ -185,6 +185,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             }
 
             // проверка возможности открытия позиции
+            // робот открывает только одну позицию
             if (openPositions == null || openPositions.Count == 0)
             {
                 LogicOpenPosition();
@@ -201,28 +202,28 @@ namespace OsEngine.Robots.OnScriptIndicators
 
 
         // открытие первой позиции по пробою индикатора Болинджер
-        // робот заходит только одной позицией
+        // робот открывает только одну позицию
         private void OpenPositionAtBollinger()
         {
             // условие входа в лонг 
             if (lastPrice > upBollinger &&
                 Regime.ValueString != "OnlyShort")
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage("Сработало условие входа в лонг", Logging.LogMessageType.User);
-
                 tab.BuyAtLimit(GetVolumeFromPercentageOfDeposit(lastPrice),
                     tab.PriceBestAsk + Slippage.ValueInt * tab.Securiti.PriceStep);
+
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage("Сработало условие входа в лонг", Logging.LogMessageType.User);
             }
             // условие входа в шорт
             else if (lastPrice < downBollinger &&
                 Regime.ValueString != "OnlyLong")
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage("Сработало условие входа в шорт", Logging.LogMessageType.User);
-
                 tab.SellAtLimit(GetVolumeFromPercentageOfDeposit(lastPrice),
                     tab.PriceBestBid - Slippage.ValueInt * tab.Securiti.PriceStep);
+
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage("Сработало условие входа в шорт", Logging.LogMessageType.User);
             }
         }
 
@@ -261,7 +262,10 @@ namespace OsEngine.Robots.OnScriptIndicators
         // обработка события не удачного закрытия позиции
         private void Tab_PositionClosingFailEvent(Position position)
         {
-            // не реализовано
+            // логика не реализована
+
+            if (OnDebug.ValueBool)
+                tab.SetNewLogMessage($"Отладка. Не удалось закрыть позицию {position.Number}", Logging.LogMessageType.User);
         }
 
 
@@ -352,8 +356,8 @@ namespace OsEngine.Robots.OnScriptIndicators
                 tab.CloseAtTrailingStop(position, priceActivation, priceOrder);
                 position.SignalTypeClose = SignalTypeClose.TrailingStop.ToString();
 
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage("Выставление трелинг стопа для лонга", Logging.LogMessageType.User);
+                //if (OnDebug.ValueBool)
+                    //tab.SetNewLogMessage("Выставление трелинг стопа для лонга", Logging.LogMessageType.User);
             }
 
             // установка трейлинг стопа для позиции шорт
@@ -368,8 +372,8 @@ namespace OsEngine.Robots.OnScriptIndicators
                 tab.CloseAtTrailingStop(position, priceActivation, priceOrder);
                 position.SignalTypeClose = SignalTypeClose.TrailingStop.ToString();
 
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage("Выставление трелинг стопа для шорта", Logging.LogMessageType.User);
+                //if (OnDebug.ValueBool)
+                    //tab.SetNewLogMessage("Выставление трелинг стопа для шорта", Logging.LogMessageType.User);
             }
         }
 
@@ -469,13 +473,6 @@ namespace OsEngine.Robots.OnScriptIndicators
                         return;
                     }
 
-                    // если цена активации окажется выше последней цены,
-                    // тогда устанавливаем цену активации, равную последней цене 
-                    if (priceActivation > lastPrice)
-                    {
-                        priceActivation = lastPrice;
-                    }
-
                     // цена стоп ордера устанавливается ниже на величину проскальзывания от цены активации
                     priceOrder = priceActivation - Slippage.ValueInt * tab.Securiti.PriceStep;
 
@@ -495,13 +492,6 @@ namespace OsEngine.Robots.OnScriptIndicators
                         priceActivation >= position.StopOrderRedLine)
                     {
                         return;
-                    }
-
-                    // если цена активации окажется ниже последней цены,
-                    // тогда устанавливаем цену активации, равную последней цене 
-                    if (priceActivation < lastPrice)
-                    {
-                        priceActivation = lastPrice;
                     }
 
                     // цена стоп ордера устанавливается выше на величину проскальзывания от цены активации
@@ -562,7 +552,6 @@ namespace OsEngine.Robots.OnScriptIndicators
 
             return result;
         }
-
 
     }
 
