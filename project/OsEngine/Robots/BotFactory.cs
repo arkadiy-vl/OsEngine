@@ -70,6 +70,7 @@ namespace OsEngine.Robots
             result.Add("RsiTrade");
             result.Add("RviTrade");
             result.Add("BollingerTrend");
+            result.Add("ArbitrageOneLeg");
 
             List<string> resultTrue = new List<string>();
 
@@ -254,6 +255,10 @@ namespace OsEngine.Robots
             if (nameClass == "BollingerTrend")
             {
                 bot = new BollingerTrend(name, startProgram);
+            }
+            if (nameClass == "ArbitrageOneLeg")
+            {
+                bot = new ArbitrageOneLeg(name, startProgram);
             }
 
 
