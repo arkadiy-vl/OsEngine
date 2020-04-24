@@ -75,7 +75,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             VolumePercent = CreateParameter("Объем входа в позицию (%)", 50, 40, 300, 10);
             Slippage = CreateParameter("Проскальзывание (в шагах цены)", 300, 1, 500, 50);
             VolumeDecimals = CreateParameter("Кол. знаков после запятой для объема", 4, 4, 10, 1);
-            MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "Bollinger", new[] { "Bollinger", "TrailingStop" });
+            MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "Bollinger-Revers", new[] { "Bollinger-Revers", "Bollinger-TrailingStop" });
             OnStopForBreakeven = CreateParameter("Вкл. стоп для перевода в безубытк", false);
             MinProfitOnStopBreakeven = CreateParameter("Мин. профит для перевода в безубытк (%)", 10, 5, 20, 1);
 
@@ -190,7 +190,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             if (lastPrice > upBollinger &&
                 Regime.ValueString != "OnlyShort")
             {
-                tab.BuyAtLimit(GetVolumeFromPercentageOfDeposit(lastPrice),
+                tab.BuyAtLimit(GetVolume(lastPrice),
                     tab.PriceBestAsk + Slippage.ValueInt * tab.Securiti.PriceStep);
 
                 if (OnDebug.ValueBool)
@@ -200,7 +200,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             else if (lastPrice < downBollinger &&
                 Regime.ValueString != "OnlyLong")
             {
-                tab.SellAtLimit(GetVolumeFromPercentageOfDeposit(lastPrice),
+                tab.SellAtLimit(GetVolume(lastPrice),
                     tab.PriceBestBid - Slippage.ValueInt * tab.Securiti.PriceStep);
 
                 if (OnDebug.ValueBool)
@@ -213,12 +213,12 @@ namespace OsEngine.Robots.OnScriptIndicators
         {
             // выход по пробою индикатора Болинжер
             // и открытие противоположной позиции по реверсной системе
-            if (MethodOutOfPosition.ValueString == "Bollinger")
+            if (MethodOutOfPosition.ValueString == "Bollinger-Revers")
             {
                 OutFromPositionByBollinger(position);
             }
             // выход по трейлинг стопу
-            else if (MethodOutOfPosition.ValueString == "TrailingStop")
+            else if (MethodOutOfPosition.ValueString == "Bollinger-TrailingStop")
             {
                 SetTrailingStop(position);
             }
@@ -271,7 +271,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                 if (Regime.ValueString != "OnlyClosePosition" &&
                     Regime.ValueString != "OnlyShort")
                 {
-                    tab.BuyAtLimit(GetVolumeFromPercentageOfDeposit(lastPrice),
+                    tab.BuyAtLimit(GetVolume(lastPrice),
                        tab.PriceBestAsk + Slippage.ValueInt * tab.Securiti.PriceStep);
 
                     if (OnDebug.ValueBool)
@@ -294,7 +294,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                 if (Regime.ValueString != "OnlyClosePosition" &&
                     Regime.ValueString != "OnlyLong")
                 {
-                    tab.SellAtLimit(GetVolumeFromPercentageOfDeposit(lastPrice),
+                    tab.SellAtLimit(GetVolume(lastPrice),
                         tab.PriceBestBid - Slippage.ValueInt * tab.Securiti.PriceStep);
 
                     if (OnDebug.ValueBool)
@@ -418,21 +418,24 @@ namespace OsEngine.Robots.OnScriptIndicators
         }
 
 
-        // получить объем входа в позицию по проценту от депозита
-        private decimal GetVolumeFromPercentageOfDeposit(decimal price)
+        // получить объем входа в позицию по заданному проценту от депозита для одной сделки
+        // предполагается, что депозит в USDT
+        private decimal GetVolume(decimal price)
         {
-            decimal usdtValue = 0.0m;
+            decimal usdtDepositValue = 0.0m;
 
+            // если робот запущен в терминале, то получаем размер депозита в с биржи в USDT
             if (startProgram.ToString() == "IsOsTrader")
             {
-                usdtValue = tab.Portfolio.GetPositionOnBoard().Find(pos => pos.SecurityNameCode == "USDT").ValueCurrent;
+                usdtDepositValue = tab.Portfolio.GetPositionOnBoard().Find(pos => pos.SecurityNameCode == "USDT").ValueCurrent;
             }
+            // иначе робот запущен в тестере или оптимизаторе, тогда размер депозита берем стандартным образом
             else
             {
-                usdtValue = tab.Portfolio.ValueCurrent;
+                usdtDepositValue = tab.Portfolio.ValueCurrent;
             }
 
-            decimal result = Math.Round(usdtValue / price * VolumePercent.ValueInt / 100.0m,
+            decimal result = Math.Round(usdtDepositValue / price * VolumePercent.ValueInt / 100.0m,
                  VolumeDecimals.ValueInt);
             if (OnDebug.ValueBool)
                 tab.SetNewLogMessage("Объем позиции:" + result.ToString(), Logging.LogMessageType.User);
@@ -442,6 +445,7 @@ namespace OsEngine.Robots.OnScriptIndicators
 
     }
 
+    // тип сигнала выхода из позиции
     enum SignalTypeClose
     {
         Bollinger,
