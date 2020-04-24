@@ -130,6 +130,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             int lengthBollinger = (int)bollinger.ParametersDigit[0].Value;
 
             if (bollinger.DataSeries[0].Values == null ||
+                candles == null ||
                 candles.Count < lengthBollinger + 4)
             {
                 return;
@@ -155,6 +156,20 @@ namespace OsEngine.Robots.OnScriptIndicators
             {
                 for (int i = 0; i < openPositions.Count; i++)
                 {
+                    // Если позиция не открыта, то ничего не делаем
+                    if (openPositions[i].State != PositionStateType.Open)
+                    {
+                        continue;
+                    }
+
+                    // Если позиция уже закрывается, то ничего не делаем
+                    if (openPositions[i].State == PositionStateType.Closing ||
+                        openPositions[i].CloseActiv == true ||
+                        (openPositions[i].CloseOrders != null && openPositions[i].CloseOrders.Count > 0))
+                    {
+                        continue;
+                    }
+
                     LogicClosePosition(openPositions[i]);
                 }
             }
@@ -249,13 +264,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         // и открытие противоположной позиции по реверсной системе
         private void OutFromPositionByBollinger(Position position)
         {
-            // Если позиция уже закрывается, то ничего не делаем
-            if (position.State == PositionStateType.Closing || position.CloseActiv == true ||
-                (position.CloseOrders != null && position.CloseOrders.Count > 0))
-            {
-                return;
-            }
-
             // закрытие шорта и открытие лонга по реверсивной системе
             if (position.Direction == Side.Sell &&
                 lastPrice > upBollinger)
@@ -313,13 +321,6 @@ namespace OsEngine.Robots.OnScriptIndicators
             // цена стоп ордера
             decimal priceOrder;
 
-            // если позиция закрывается, то ничего не делаем
-            if (position.State == PositionStateType.Closing || position.CloseActiv == true ||
-               (position.CloseOrders != null && position.CloseOrders.Count > 0))
-            {
-                return;
-            }
-
             // установка трейлинг стопа для позиции лонг
             if (position.Direction == Side.Buy)
             {
@@ -363,13 +364,6 @@ namespace OsEngine.Robots.OnScriptIndicators
             // цена стоп ордера
             decimal priceOrder;
 
-            // если позиция закрывается, то ничего не делаем
-            if (position.State == PositionStateType.Closing || position.CloseActiv == true ||
-               (position.CloseOrders != null && position.CloseOrders.Count > 0))
-            {
-                return;
-            }
-
             // Проверяем, что профит позиции больше минимально заданного профита
             if (position.ProfitOperationPersent > Convert.ToDecimal(MinProfitOnStopBreakeven.ValueInt))
             {
@@ -382,7 +376,8 @@ namespace OsEngine.Robots.OnScriptIndicators
 
                     // если у позиции уже установлена цена активации и она не меньше, чем priceActivation,
                     // то ничего не делаем
-                    if (priceActivation <= position.StopOrderRedLine)
+                    if (position.StopOrderRedLine > 0 &&
+                        priceActivation <= position.StopOrderRedLine)
                     {
                         return;
                     }
