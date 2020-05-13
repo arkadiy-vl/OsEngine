@@ -37,6 +37,7 @@ using OsEngine.Market.Servers.Tester;
 using OsEngine.Market.Servers.Transaq;
 using OsEngine.Market.Servers.ZB;
 using OsEngine.Market.Servers.Hitbtc;
+using OsEngine.Market.Servers.MFD;
 using OsEngine.Market.Servers.MOEX;
 using OsEngine.Market.Servers.Tinkoff;
 using MessageBox = System.Windows.MessageBox;
@@ -69,15 +70,15 @@ namespace OsEngine.Market
             {
                 List<ServerType> serverTypes = new List<ServerType>();
 
-
-                
                 serverTypes.Add(ServerType.QuikDde);
                 serverTypes.Add(ServerType.QuikLua);
                 serverTypes.Add(ServerType.SmartCom);
                 serverTypes.Add(ServerType.Plaza);
                 serverTypes.Add(ServerType.Transaq);
                 serverTypes.Add(ServerType.Tinkoff);
+                serverTypes.Add(ServerType.Finam);
                 serverTypes.Add(ServerType.MoexDataServer);
+                serverTypes.Add(ServerType.MfdWeb);
 
                 serverTypes.Add(ServerType.GateIo);
                 serverTypes.Add(ServerType.BitMax);
@@ -116,8 +117,6 @@ namespace OsEngine.Market
 
                 return types;
             }
-
-
         }
 
         /// <summary>
@@ -189,6 +188,10 @@ namespace OsEngine.Market
                 }
 
                 IServer newServer = null;
+                if (type == ServerType.MfdWeb)
+                {
+                    newServer = new MfdServer();
+                }
                 if (type == ServerType.MoexDataServer)
                 {
                     newServer = new MoexDataServer();
@@ -365,8 +368,56 @@ namespace OsEngine.Market
         /// </summary>
         public static event Action<IServer> ServerCreateEvent;
 
-// creating servers automatically 
-// создание серверов автоматически
+        // доступ к разрешениям для серверов
+
+        private static List<IServerPermission> _serversPermissions = new List<IServerPermission>();
+
+        public static IServerPermission GetServerPermission(ServerType type)
+        {
+            IServerPermission serverPermission = null;
+
+            if (type == ServerType.MoexDataServer)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
+
+                if (serverPermission == null)
+                {
+                    serverPermission = new MoexIssPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
+            if (type == ServerType.MfdWeb)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
+
+                if (serverPermission == null)
+                {
+                    serverPermission = new MfdServerPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
+            if (type == ServerType.Tinkoff)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
+
+                if (serverPermission == null)
+                {
+                    serverPermission = new TinkoffServerPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
+
+            return null;
+        }
+
+        
+        // создание серверов автоматически creating servers automatically 
 
         /// <summary>
         /// upload server settings
@@ -806,7 +857,12 @@ namespace OsEngine.Market
         /// <summary>
         /// Дата сервер московской биржи
         /// </summary>
-        MoexDataServer
+        MoexDataServer,
+
+        /// <summary>
+        /// MFD web server
+        /// </summary>
+        MfdWeb,
     }
 
 }
