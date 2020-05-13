@@ -16,9 +16,9 @@ namespace OsEngine.Robots.OnScriptIndicators
         public StrategyParameterString Regime;
         public StrategyParameterInt LenghtMA;
         public StrategyParameterInt VolumePercent;
+        public StrategyParameterInt Slippage;
         // число знаков после запятой для вычисления объема входа в позицию
         public StrategyParameterInt VolumeDecimals;
-        public StrategyParameterInt Slippage;
 
         private IvashovRange ivashovRange;
         private MovingAverage ma;
