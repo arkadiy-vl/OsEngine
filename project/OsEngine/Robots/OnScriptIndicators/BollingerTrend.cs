@@ -70,14 +70,14 @@ namespace OsEngine.Robots.OnScriptIndicators
             // создаем настроечные параметры робота
             Regime = CreateParameter("Режим работы бота", "Off", new[] { "On", "Off", "OnlyClosePosition", "OnlyShort", "OnlyLong" });
             OnDebug = CreateParameter("Включить отладку", false);
-            BollingerLength = CreateParameter("Длина болинжера", 50, 50, 200, 10);
+            BollingerLength = CreateParameter("Длина болинжера", 100, 50, 200, 10);
             BollingerDeviation = CreateParameter("Отклонение болинжера", 1.5m, 1.0m, 3.0m, 0.2m);
             VolumePercent = CreateParameter("Объем входа в позицию (%)", 50, 40, 300, 10);
-            Slippage = CreateParameter("Проскальзывание (в шагах цены)", 300, 1, 500, 50);
+            Slippage = CreateParameter("Проскальзывание (в шагах цены)", 350, 1, 500, 50);
             VolumeDecimals = CreateParameter("Кол. знаков после запятой для объема", 4, 4, 10, 1);
             MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "Bollinger-Revers", new[] { "Bollinger-Revers", "Bollinger-TrailingStop" });
-            OnStopForBreakeven = CreateParameter("Вкл. стоп для перевода в безубытк", false);
-            MinProfitOnStopBreakeven = CreateParameter("Мин. профит для перевода в безубытк (%)", 10, 5, 20, 1);
+            OnStopForBreakeven = CreateParameter("Вкл. стоп для перевода в безубытк", true);
+            MinProfitOnStopBreakeven = CreateParameter("Мин. профит для перевода в безубытк (%)", 7, 5, 20, 1);
 
             // создаем индикаторы на вкладке робота и задаем для них параметры
             bollinger = IndicatorsFactory.CreateIndicatorByName("Bollinger", name + "Bollinger", false);
