@@ -35,7 +35,7 @@ namespace OsEngine.Robots
         public static List<string> GetNamesStrategy()
         {
             List<string> result = new List<string>();
-
+            result.Add("Fisher");
             result.Add("Engine");
             result.Add("ClusterEngine");
             result.Add("FundBalanceDivergenceBot");
@@ -113,6 +113,11 @@ namespace OsEngine.Robots
                 return bot;
             }
 
+            
+            if (nameClass == "Fisher")
+            {
+                bot = new Fisher(name, startProgram);
+            }
             if (nameClass == "FundBalanceDivergenceBot")
             {
                 bot = new FundBalanceDivergenceBot(name, startProgram);
@@ -397,6 +402,7 @@ namespace OsEngine.Robots
                 // Помечаем сборку, как временную
                 cp.GenerateInMemory = true;
                 cp.IncludeDebugInformation = true;
+              
                
                 // Обрабатываем CSC компилятором
                 CompilerResults results = prov.CompileAssemblyFromSource(cp, fileStr);
