@@ -694,6 +694,22 @@ position => position.State != PositionStateType.OpeningFail
         }
 
         /// <summary>
+        /// create button type parameter / 
+        /// создать параметр типа Button
+        /// </summary>
+        public StrategyParameterButton CreateParameterButton(string buttonLabel)
+        {
+            StrategyParameterButton newParameter = new StrategyParameterButton(buttonLabel);
+
+            if (_parameters.Find(p => p.Name == buttonLabel) != null)
+            {
+                throw new Exception(OsLocalization.Trader.Label52);
+            }
+
+            return (StrategyParameterButton)LoadParameterValues(newParameter);
+        }
+
+        /// <summary>
         /// load parameter settings / 
         /// загрузить настройки параметра
         /// </summary>
@@ -1279,6 +1295,32 @@ position => position.State != PositionStateType.OpeningFail
             }
         }
 
+        /// <summary>
+        /// убрать все вкладки
+        /// </summary>
+        public void ClearTabs()
+        {
+            for (int i = 0; TabsSimple != null && i < TabsSimple.Count; i++)
+            {
+                TabsSimple[i].Clear();
+            }
+            for (int i = 0; TabsIndex != null && i < TabsIndex.Count; i++)
+            {
+                TabsIndex[i].Clear();
+            }
+            for (int i = 0; TabsCluster != null && i < TabsCluster.Count; i++)
+            {
+                TabsCluster[i].Clear();
+            }
+
+            if (_botTabs != null)
+            {
+                _botTabs.Clear();
+            }
+
+            ActivTab = null;
+        }
+
         // call control windows / вызыв окон управления
 
 
@@ -1316,7 +1358,7 @@ position => position.State != PositionStateType.OpeningFail
         /// send new message / 
         /// выслать новое сообщение на верх
         /// </summary>
-        private void SendNewLogMessage(string message, LogMessageType type)
+        protected void SendNewLogMessage(string message, LogMessageType type)
         {
             if (LogMessageEvent != null)
             {

@@ -286,6 +286,10 @@
     <Compile Include="Charts\CandleChart\Indicators\StochRsiUi.xaml.cs">
       <DependentUpon>StochRsiUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Charts\CandleChart\Indicators\TickVolume.cs" />
+    <Compile Include="Charts\CandleChart\Indicators\TickVolumeUi.xaml.cs">
+      <DependentUpon>TickVolumeUi.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Charts\CandleChart\Indicators\TradeThread.cs" />
     <Compile Include="Charts\CandleChart\Indicators\Trix.cs" />
     <Compile Include="Charts\CandleChart\Indicators\TrixUi.xaml.cs">
@@ -342,6 +346,7 @@
     <Compile Include="Entity\StartProgramm.cs" />
     <Compile Include="Entity\StrategyParameter.cs" />
     <Compile Include="Entity\TimeFrameBuilder.cs" />
+    <Compile Include="Entity\Utils\CompressionUtils.cs" />
     <Compile Include="Indicators\Aindicator.cs" />
     <Compile Include="Indicators\AIndicatorUi.xaml.cs">
       <DependentUpon>AIndicatorUi.xaml</DependentUpon>
@@ -931,6 +936,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Charts\CandleChart\Indicators\TickVolumeUi.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Charts\CandleChart\Indicators\TrixUi.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -1365,7 +1374,6 @@
   <ItemGroup>
     <Resource Include="Images\MainWIndow\gear.png" />
   </ItemGroup>
-  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -5,11 +5,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading;
-using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Entity;
-using OsEngine.Market;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Tab;
 using OsEngine.Indicators;
@@ -47,10 +44,6 @@ namespace OsEngine.Robots.High_Frequency
 
         private bool _isDisposed;
 
-        /// <summary>
-        /// uniq strategy name
-        /// взять уникальное имя
-        /// </summary>
         public override string GetNameStrategyType()
         {
             return "Fisher";
@@ -62,8 +55,6 @@ namespace OsEngine.Robots.High_Frequency
         }
 
         private BotTabSimple _tab;
-
-//indicators индикаторы
 
         private Aindicator _sma;
 
