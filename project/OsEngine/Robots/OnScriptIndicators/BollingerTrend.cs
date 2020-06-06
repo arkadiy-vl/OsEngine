@@ -188,12 +188,14 @@ namespace OsEngine.Robots.OnScriptIndicators
                     }
 
                     // если позиция уже закрывается, то ничего не делаем
+                    /*
                     if (openPositions[i].State == PositionStateType.Closing ||
                         openPositions[i].CloseActiv == true ||
                         (openPositions[i].CloseOrders != null && openPositions[i].CloseOrders.Count > 0))
                     {
                         continue;
                     }
+                    */
 
                     // вариант выхода из позиции по пробою индикатора Болинжер
                     if (MethodOutOfPosition.ValueString == "Bollinger-Revers")
@@ -205,7 +207,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                     {
                         SetTrailingStop(openPositions[i]);
                     }
-                    // вариант вызода из позиции по умолчанию
+                    // вариант выхода из позиции по умолчанию
                     else
                     {
                         OutFromPositionByBollinger(openPositions[i]);
@@ -257,10 +259,16 @@ namespace OsEngine.Robots.OnScriptIndicators
         //------------------------------------
         private void Tab_MarketDepthUpdateEvent(MarketDepth marketDepth)
         {
-            if(marketDepth != null)
+            // проверка корректности полученного стакана
+            if (marketDepth.Asks != null && marketDepth.Asks.Count != 0 &&
+                marketDepth.Bids != null && marketDepth.Bids.Count != 0)
             {
-                flagUpdateMarketDepth = true;
+                // сохраняем полученный стакан
                 lastMarketDepth = marketDepth;
+
+                // устанавливаем флаг обновления стакана
+                flagUpdateMarketDepth = true;
+                
             }
         }
         //----------------------------------------------------------------------------------------------
