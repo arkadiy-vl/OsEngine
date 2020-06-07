@@ -68,8 +68,8 @@ namespace OsEngine.Robots.OnScriptIndicators
         // последний стакан
         private MarketDepth lastMarketDepth;
 
-        // флаг обновления стакана
-        private bool flagUpdateMarketDepth;
+        // максимальная глубина анализа стакана
+        private int MaxLevelsInMarketDepth;
 
         // имя запущщеной программы: тестер (IsTester), робот (IsOsTrade), оптимизатор (IsOsOptimizer)
         private readonly StartProgram startProgram;
@@ -105,7 +105,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             bollinger.Save();
 
             // сбрасываем флаг обновления стакана
-            flagUpdateMarketDepth = false;
+            MaxLevelsInMarketDepth = 10;
 
             // подписываемся на события
             tab.CandleFinishedEvent += Tab_CandleFinishedEvent;
@@ -152,7 +152,7 @@ namespace OsEngine.Robots.OnScriptIndicators
 
             int lengthBollinger = (int)bollinger.ParametersDigit[0].Value;
 
-            if (bollinger.DataSeries[0].Values == null ||
+            if (bollinger.DataSeries[0].Values == null || bollinger.DataSeries[1].Values == null ||
                 candles == null ||
                 candles.Count < lengthBollinger + 4)
             {
@@ -200,7 +200,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                     // вариант выхода из позиции по пробою индикатора Болинжер
                     if (MethodOutOfPosition.ValueString == "Bollinger-Revers")
                     {
-                        OutFromPositionByBollinger(openPositions[i]);
+                        OutOfPositionByBollinger(openPositions[i]);
                     }
                     // вариант выхода из позиции по трейлинг стопу
                     else if (MethodOutOfPosition.ValueString == "Bollinger-TrailingStop")
@@ -210,7 +210,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                     // вариант выхода из позиции по умолчанию
                     else
                     {
-                        OutFromPositionByBollinger(openPositions[i]);
+                        OutOfPositionByBollinger(openPositions[i]);
                     }
 
                     // установка стопа для перевода позиции в безубыток
@@ -256,25 +256,29 @@ namespace OsEngine.Robots.OnScriptIndicators
 
         //------------------------------------
         // Обработка события изменения стакана
+        // просто сохраняем в роботе полученный стакан, чтобы он всегда был актуальный
         //------------------------------------
         private void Tab_MarketDepthUpdateEvent(MarketDepth marketDepth)
         {
+            if (Regime.ValueString == "Off")
+            {
+                return;
+            }
+
             // проверка корректности полученного стакана
             if (marketDepth.Asks != null && marketDepth.Asks.Count != 0 &&
                 marketDepth.Bids != null && marketDepth.Bids.Count != 0)
             {
                 // сохраняем полученный стакан
                 lastMarketDepth = marketDepth;
-
-                // устанавливаем флаг обновления стакана
-                flagUpdateMarketDepth = true;
-                
             }
+
+            return;
         }
         //----------------------------------------------------------------------------------------------
         // Выход из позиции по пробою Болинджера и открытие противоположной позиции по реверсной системе
         //----------------------------------------------------------------------------------------------
-        private void OutFromPositionByBollinger(Position position)
+        private void OutOfPositionByBollinger(Position position)
         {
             // условие закрытия шорта
             if (position.Direction == Side.Sell &&
@@ -313,13 +317,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         //--------------------------------
         private Position OpenLong()
         {
-            // ждем обновление стакана
-            flagUpdateMarketDepth = false;
-            while (!flagUpdateMarketDepth)
-            {
-                continue;
-            }
-
             // Определяем объем и цену входа в позицию лонг
             decimal volumePosition = GetVolumePosition(lastMarketDepth.Asks[1].Price, DepositNameCode.ValueString);
             decimal pricePosition = GetPriceBuy(volumePosition);
@@ -346,13 +343,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         //--------------------------------
         private Position OpenShort()
         {
-            // ждем обновление стакана
-            flagUpdateMarketDepth = false;
-            while (!flagUpdateMarketDepth)
-            {
-                continue;
-            }
-            
             // определяем объем и цену входа в позицию шорт
             decimal volumePosition = GetVolumePosition(lastMarketDepth.Bids[1].Price, DepositNameCode.ValueString);
             decimal pricePosition = GetPriceSell(volumePosition);
@@ -378,13 +368,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         //----------------------
         private void CloseLong(Position position)
         {
-            // ждем обновление стакана
-            flagUpdateMarketDepth = false;
-            while (!flagUpdateMarketDepth)
-            {
-                continue;
-            }
-
             // получить цену из стакана, по которой можно продать весь объем для закрытия позиции лонг
             decimal volumePosition = position.OpenVolume;
             decimal pricePosition = GetPriceSell(volumePosition);
@@ -417,13 +400,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         //----------------------
         private void CloseShort(Position position)
         {
-            // ждем обновление стакана
-            flagUpdateMarketDepth = false;
-            while (!flagUpdateMarketDepth)
-            {
-                continue;
-            }
-
             // получить цену из стакана, по которой можно купить весь объем для закрытия позиции шорт
             decimal volumePosition = position.OpenVolume;
             decimal pricePosition = GetPriceBuy(volumePosition);
@@ -607,7 +583,9 @@ namespace OsEngine.Robots.OnScriptIndicators
             if (startProgram.ToString() == "IsOsTrader")
             {
                 if (volume == 0)
+                {
                     return 0.0m;
+                }
                 
                 // цена покупки
                 decimal priceBuy = 0.0m;
