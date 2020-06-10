@@ -12,11 +12,7 @@ namespace OsEngine.Robots.OnScriptIndicators
 {
     class BollingerTrend : BotPanel
     {
-        // вкладки робота
-        private BotTabSimple tab;
-
-        // индикаторы для робота
-        private Aindicator bollinger;
+        #region // Публичные настроечные параметры робота
 
         // режим работы
         public StrategyParameterString Regime;
@@ -56,6 +52,15 @@ namespace OsEngine.Robots.OnScriptIndicators
 
         // разность по времени в часах между временем на сервере, где запущен бот, и временем на бирже
         public int shiftTimeExchange = 5;
+        #endregion
+
+        #region // Приватные параметры робота
+
+        // вкладки робота
+        private BotTabSimple tab;
+
+        // индикаторы для робота
+        private Aindicator bollinger;
 
         // последняя цена
         private decimal lastPrice;
@@ -64,7 +69,7 @@ namespace OsEngine.Robots.OnScriptIndicators
         private decimal highLastCandle;
         private decimal lowLastCandle;
 
-        // параметры индикаторов
+        // последний верхний и нижний болинджер
         private decimal upBollinger;
         private decimal downBollinger;
 
@@ -79,8 +84,13 @@ namespace OsEngine.Robots.OnScriptIndicators
 
         // имя запущщеной программы: тестер (IsTester), робот (IsOsTrade), оптимизатор (IsOsOptimizer)
         private readonly StartProgram startProgram;
+        #endregion
 
-        // конструктор
+        /// <summary>
+        /// Конструктор
+        /// </summary>
+        /// <param name="name">Имя робота</param>
+        /// <param name="startProgram">Программа, в которой запущен робот</param>
         public BollingerTrend(string name, StartProgram startProgram) : base(name, startProgram)
         {
             this.startProgram = startProgram;
@@ -117,21 +127,26 @@ namespace OsEngine.Robots.OnScriptIndicators
             ParametrsChangeByUser += BollingerTrend_ParametrsChangeByUser;
         }
 
-
-        //-----------------
-        // сервисная логика
-        //-----------------
+        /// <summary>
+        /// Сервисный метод получения названия робота
+        /// </summary>
+        /// <returns>название робота</returns>
         public override string GetNameStrategyType()
         {
             return "BollingerTrend";
         }
 
+        /// <summary>
+        /// Сервисный метод вызова окна индивидуальных настроек робота
+        /// </summary>
         public override void ShowIndividualSettingsDialog()
         {
-            // не требуется
+            // не требуется, сделано через настроечные параметры
         }
 
-        // при изменении настроечных параметров индикаторов изменяем параметры индикаторов 
+        /// <summary>
+        /// Обработка события изменения настроечных параметров робота
+        /// </summary>
         private void BollingerTrend_ParametrsChangeByUser()
         {
             if (bollinger.ParametersDigit[0].Value != BollingerLength.ValueInt ||
@@ -143,9 +158,10 @@ namespace OsEngine.Robots.OnScriptIndicators
             }
         }
 
-        //------------------------------------------------------------
-        // Обработка события закрытия свечи - базовая торговая логика
-        //------------------------------------------------------------
+        /// <summary>
+        /// Обработка события закрытия свечи - базовая торговая логика
+        /// </summary>
+        /// <param name="candles">Список свечей</param>
         private void Tab_CandleFinishedEvent(List<Candle> candles)
         {
             if (Regime.ValueString == "Off")
@@ -157,13 +173,13 @@ namespace OsEngine.Robots.OnScriptIndicators
             int lengthBollinger = (int)bollinger.ParametersDigit[0].Value;
 
             // проверка на достаточное количество свечек и наличие данных в болинджере
-            if (candles == null || candles.Count < lengthBollinger + 4 ||
+            if (candles == null || candles.Count < lengthBollinger + 2 ||
                 bollinger.DataSeries[0].Values == null || bollinger.DataSeries[1].Values == null)
             {
                 return;
             }
 
-            // сохраняем последние значения параметров цены и болинджера для удобства
+            // сохраняем последние значения параметров цены и болинджера для дальнейшего сокращения длины кода
             lastPrice = candles[candles.Count - 1].Close;
             highLastCandle = candles[candles.Count - 1].High;
             lowLastCandle = candles[candles.Count - 1].Low;
@@ -250,10 +266,10 @@ namespace OsEngine.Robots.OnScriptIndicators
             return;
         }
 
-
-        //-----------------------------------------------
-        // Обработка события не удачного закрытия позиции
-        //-----------------------------------------------
+        /// <summary>
+        /// Обработка события не удачного закрытия позиции
+        /// </summary>
+        /// <param name="position">позиция, которая не закрылась</param>
         private void Tab_PositionClosingFailEvent(Position position)
         {
             // реакция не удачное закрытие позиции задается в настройках сопровождения позиции в самом боте
@@ -264,10 +280,10 @@ namespace OsEngine.Robots.OnScriptIndicators
             return;
         }
 
-
-        //------------------------------------
-        // Обработка события изменения стакана
-        //------------------------------------
+        /// <summary>
+        /// Обработка события изменения стакана
+        /// </summary>
+        /// <param name="marketDepth">Полученный стакан</param>
         private void Tab_MarketDepthUpdateEvent(MarketDepth marketDepth)
         {
             if (Regime.ValueString == "Off")
@@ -286,10 +302,10 @@ namespace OsEngine.Robots.OnScriptIndicators
             return;
         }
 
-
-        //----------------------------------------------------------------------------------------------
-        // Выход из позиции по пробою Болинджера и открытие противоположной позиции по реверсной системе
-        //----------------------------------------------------------------------------------------------
+        /// <summary>
+        /// Метод выхода из позиции по пробою Болинджера и открытия противоположной позиции по реверсной системе
+        /// </summary>
+        /// <param name="position">Позиция, которая проверяется на условия выхода</param>
         private void OutOfPositionByBollinger(Position position)
         {
             // условие закрытия шорта (пробитие ценой противоположного болинджера)
@@ -323,128 +339,10 @@ namespace OsEngine.Robots.OnScriptIndicators
             return;
         }
 
-        //--------------------------------
-        // Открытие позиции лонг по лимиту
-        //--------------------------------
-        private Position OpenLong()
-        {
-            // Определяем объем и цену входа в позицию лонг
-            decimal volumePosition = GetVolumePosition(tab.PriceBestAsk, DepositNameCode.ValueString);
-            decimal pricePosition = GetPriceBuy(volumePosition);
-
-            // проверка корректности расчитанного объема позиции и цены позиции
-            if (volumePosition <= 0 || pricePosition <= 0)
-            {
-                return null;
-            }
-
-            // к цене входа в позицию добавляем проскальзывание (покупаем дороже)
-            decimal priceOpenPosition = pricePosition + Slippage.ValueInt * tab.Securiti.PriceStep;
-
-            // вход в позицию лонг по лимиту
-            Position position = tab.BuyAtLimit(volumePosition, priceOpenPosition);
-
-            if (OnDebug.ValueBool)
-                tab.SetNewLogMessage($"Отладка. Открытие лонга по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {priceOpenPosition}.", Logging.LogMessageType.User);
-
-            return position;
-        }
-
-        //--------------------------------
-        // Открытие позиции шорт по лимиту
-        //--------------------------------
-        private Position OpenShort()
-        {
-            // определяем объем и цену входа в позицию шорт
-            decimal volumePosition = GetVolumePosition(tab.PriceBestBid, DepositNameCode.ValueString);
-            decimal pricePosition = GetPriceSell(volumePosition);
-
-            if (volumePosition <= 0 || pricePosition <= 0)
-            {
-                return null;
-            }
-
-            // из цены вход в позицию вычитаем проскальзывание (продаем дешевле)
-            decimal priceOpenPosition = pricePosition - Slippage.ValueInt * tab.Securiti.PriceStep;
-
-            // вход в позицию шорт по лимиту
-            Position position = tab.SellAtLimit(volumePosition, priceOpenPosition);
-
-            if (OnDebug.ValueBool)
-                tab.SetNewLogMessage($"Отладка. Открытие шорта по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {priceOpenPosition}.", Logging.LogMessageType.User);
-
-            return position;
-        }
-
-        //--------------------------------
-        // Закрытие позиции лонг (продажа)
-        //--------------------------------
-        private void CloseLong(Position position)
-        {
-            // получить цену из стакана, по которой можно продать весь объем для закрытия позиции лонг
-            decimal volumePosition = position.OpenVolume;
-            decimal pricePosition = GetPriceSell(volumePosition);
-
-            // если цена выхода из позиции посчиталась правильно, тогда выход из позиции по лимиту
-            if (pricePosition > 0)
-            {
-                // из цены выхода из позиции вычитаем проскальзывание (продаем дешевле)
-                decimal priceClosePosition = pricePosition - Slippage.ValueInt * tab.Securiti.PriceStep;
-
-                // выход из позиции лонг по лимиту
-                tab.CloseAtLimit(position, priceClosePosition, volumePosition);
-
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Закрытие лонга по лимиту: объем - {volumePosition}, цена - {pricePosition}, цена с проск.- {priceClosePosition}.", Logging.LogMessageType.User);
-            }
-            // если цена выхода не посчиталась, тогда выход из позиции лонг по маркету
-            else
-            {
-                tab.CloseAtMarket(position, volumePosition);
-
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Закрытие лонга по маркету: объем - {volumePosition}.", Logging.LogMessageType.User);
-            }
-
-            return;
-        }
-
-        //--------------------------------
-        // Закрытие позиции шорт (покупка)
-        //--------------------------------
-        private void CloseShort(Position position)
-        {
-            // получить цену из стакана, по которой можно купить весь объем для закрытия позиции шорт
-            decimal volumePosition = position.OpenVolume;
-            decimal pricePosition = GetPriceBuy(volumePosition);
-
-            // если цена выхода из позиции посчиталась правильно, тогда выход из позиции шорт по лимиту
-            if (pricePosition > 0)
-            {
-                // к цене выхода из позиции добавляем проскальзывание (покупаем дороже)
-                decimal priceClosePosition = pricePosition + Slippage.ValueInt * tab.Securiti.PriceStep;
-
-                // выход из позиции шорт по лимиту
-                tab.CloseAtLimit(position, priceClosePosition, volumePosition);
-
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Закрытие шорта по лимиту: объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {priceClosePosition}.", Logging.LogMessageType.User);
-            }
-            // если цена выхода из позиции не посчиталась, тогда выход из позиции шорт по маркету
-            else
-            {
-                tab.CloseAtMarket(position, volumePosition);
-
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Закрытие шорта по маркету: объем - {volumePosition}.", Logging.LogMessageType.User);
-            }
-
-            return;
-        }
-
-        //-----------------------------------------------------------------------
-        // Установка трейлинг стопа (вариант выхода из позиции по трейлинг стопу)
-        //-----------------------------------------------------------------------
+        /// <summary>
+        /// Метод выхода из позиции по трейлинг стопу (установка трейлинг стопа)
+        /// </summary>
+        /// <param name="position"></param>
         private void SetTrailingStop(Position position)
         {
             // цена активации стоп ордера
@@ -458,7 +356,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             {
                 // цена активации ставится величину трейлинг стопа от максимума последней свечи
                 // или на последний нижний болинджер
-                priceActivation = Math.Max(lowLastCandle * (1 - TrailingStopPercent.ValueInt/100.0m), bollinger.DataSeries[1].Last);
+                priceActivation = Math.Max(lowLastCandle * (1 - TrailingStopPercent.ValueInt / 100.0m), bollinger.DataSeries[1].Last);
 
                 // цена стоп ордера ставится ниже на величину двух проскальзываний от цены активации
                 priceOrder = priceActivation - 2 * Slippage.ValueInt * tab.Securiti.PriceStep;
@@ -471,7 +369,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             {
                 // цена активации ставится на величину трейлинг стопа от минимума последней свечи
                 // или на последний верхний болинджер
-                priceActivation = Math.Min(highLastCandle * (1.0m + TrailingStopPercent.ValueInt/100.0m), bollinger.DataSeries[0].Last);
+                priceActivation = Math.Min(highLastCandle * (1.0m + TrailingStopPercent.ValueInt / 100.0m), bollinger.DataSeries[0].Last);
 
                 // цена стоп ордера ставится выше на величину двух проскальзываний от цены активации
                 priceOrder = priceActivation + 2 * Slippage.ValueInt * tab.Securiti.PriceStep;
@@ -482,10 +380,10 @@ namespace OsEngine.Robots.OnScriptIndicators
             return;
         }
 
-
-        //-----------------------------------------------------------------------------
-        // Установка стопа для перевода позиции в безубыток при достижении мин. профита
-        //-----------------------------------------------------------------------------
+        /// <summary>
+        /// Метод перевода позиции в безубыток при достижении мин. профита
+        /// </summary>
+        /// <param name="position">Позиция, которая проверяется на возможность перевода в безубыток</param>
         private void SetStopForBreakeven(Position position)
         {
             // цена активации стоп ордера
@@ -554,9 +452,135 @@ namespace OsEngine.Robots.OnScriptIndicators
             return;
         }
 
-        //-----------------------------------------------------------------
-        // Получение объема входа в позицию по заданному проценту от депозита
-        //-----------------------------------------------------------------
+        /// <summary>
+        /// Открытие позиции лонг по лимиту
+        /// </summary>
+        /// <returns>Позиция, которая будет открыта</returns>
+        private Position OpenLong()
+        {
+            // Определяем объем и цену входа в позицию лонг
+            decimal volumePosition = GetVolumePosition(tab.PriceBestAsk, DepositNameCode.ValueString);
+            decimal pricePosition = GetPriceBuy(volumePosition);
+
+            // проверка корректности расчитанного объема позиции и цены позиции
+            if (volumePosition <= 0 || pricePosition <= 0)
+            {
+                return null;
+            }
+
+            // к цене входа в позицию добавляем проскальзывание (покупаем дороже)
+            decimal priceOpenPosition = pricePosition + Slippage.ValueInt * tab.Securiti.PriceStep;
+
+            // вход в позицию лонг по лимиту
+            Position position = tab.BuyAtLimit(volumePosition, priceOpenPosition);
+
+            if (OnDebug.ValueBool)
+                tab.SetNewLogMessage($"Отладка. Открытие лонга по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {priceOpenPosition}.", Logging.LogMessageType.User);
+
+            return position;
+        }
+
+        /// <summary>
+        /// Открытие позиции шорт по лимиту
+        /// </summary>
+        /// <returns>Позиция, которая будет открыта</returns>
+        private Position OpenShort()
+        {
+            // определяем объем и цену входа в позицию шорт
+            decimal volumePosition = GetVolumePosition(tab.PriceBestBid, DepositNameCode.ValueString);
+            decimal pricePosition = GetPriceSell(volumePosition);
+
+            if (volumePosition <= 0 || pricePosition <= 0)
+            {
+                return null;
+            }
+
+            // из цены вход в позицию вычитаем проскальзывание (продаем дешевле)
+            decimal priceOpenPosition = pricePosition - Slippage.ValueInt * tab.Securiti.PriceStep;
+
+            // вход в позицию шорт по лимиту
+            Position position = tab.SellAtLimit(volumePosition, priceOpenPosition);
+
+            if (OnDebug.ValueBool)
+                tab.SetNewLogMessage($"Отладка. Открытие шорта по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {priceOpenPosition}.", Logging.LogMessageType.User);
+
+            return position;
+        }
+
+        /// <summary>
+        /// Закрытие позиции лонг (продажа)
+        /// </summary>
+        /// <param name="position">Позиция, которая будет закрыта</param>
+        private void CloseLong(Position position)
+        {
+            // получить цену из стакана, по которой можно продать весь объем для закрытия позиции лонг
+            decimal volumePosition = position.OpenVolume;
+            decimal pricePosition = GetPriceSell(volumePosition);
+
+            // если цена выхода из позиции посчиталась правильно, тогда выход из позиции по лимиту
+            if (pricePosition > 0)
+            {
+                // из цены выхода из позиции вычитаем проскальзывание (продаем дешевле)
+                decimal priceClosePosition = pricePosition - Slippage.ValueInt * tab.Securiti.PriceStep;
+
+                // выход из позиции лонг по лимиту
+                tab.CloseAtLimit(position, priceClosePosition, volumePosition);
+
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Закрытие лонга по лимиту: объем - {volumePosition}, цена - {pricePosition}, цена с проск.- {priceClosePosition}.", Logging.LogMessageType.User);
+            }
+            // если цена выхода не посчиталась, тогда выход из позиции лонг по маркету
+            else
+            {
+                tab.CloseAtMarket(position, volumePosition);
+
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Закрытие лонга по маркету: объем - {volumePosition}.", Logging.LogMessageType.User);
+            }
+
+            return;
+        }
+
+        /// <summary>
+        /// Закрытие позиции шорт (покупка)
+        /// </summary>
+        /// <param name="position"></param>
+        private void CloseShort(Position position)
+        {
+            // получить цену из стакана, по которой можно купить весь объем для закрытия позиции шорт
+            decimal volumePosition = position.OpenVolume;
+            decimal pricePosition = GetPriceBuy(volumePosition);
+
+            // если цена выхода из позиции посчиталась правильно, тогда выход из позиции шорт по лимиту
+            if (pricePosition > 0)
+            {
+                // к цене выхода из позиции добавляем проскальзывание (покупаем дороже)
+                decimal priceClosePosition = pricePosition + Slippage.ValueInt * tab.Securiti.PriceStep;
+
+                // выход из позиции шорт по лимиту
+                tab.CloseAtLimit(position, priceClosePosition, volumePosition);
+
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Закрытие шорта по лимиту: объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {priceClosePosition}.", Logging.LogMessageType.User);
+            }
+            // если цена выхода из позиции не посчиталась, тогда выход из позиции шорт по маркету
+            else
+            {
+                tab.CloseAtMarket(position, volumePosition);
+
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Закрытие шорта по маркету: объем - {volumePosition}.", Logging.LogMessageType.User);
+            }
+
+            return;
+        }
+
+        /// <summary>
+        /// Получение объема входа в позицию по проценту от размера депозита (задается в настроечных параметрах)
+        /// </summary>
+        /// <param name="price">Цена торгуемого инструмента</param>
+        /// <param name="securityNameCode">Код инструмента, в котором имеем депозит на бирже</param>
+        /// <returns>Объем для входа в позицию по торгуемому инструменту</returns>
         private decimal GetVolumePosition(decimal price, string securityNameCode = "")
         {
             // проверка на корректность переданной цены инструмента
@@ -603,9 +627,11 @@ namespace OsEngine.Robots.OnScriptIndicators
             return volumePosition;
         }
 
-        //--------------------------------------------------------------------
-        //Получение цены из стакана, по которой можно купить весь объем позиции
-        //--------------------------------------------------------------------
+        /// <summary>
+        /// Получение из стакана цены Ask, по которой можно купить весь объем позиции
+        /// </summary>
+        /// <param name="volume">Объем позиции, для которого надо определить цену покупки</param>
+        /// <returns>Цена входа в позицию</returns>
         private decimal GetPriceBuy(decimal volume)
         {
             // проверка на корректность переданного объема, на наличие и актуальность стакана
@@ -661,9 +687,11 @@ namespace OsEngine.Robots.OnScriptIndicators
             }
         }
 
-        //---------------------------------------------------------------------
-        //Получить цену из стакана, по которой можно продать весь объем позиции
-        //---------------------------------------------------------------------
+        /// <summary>
+        /// Получение из стакана  цены Bid, по которой можно продать весь объем позиции
+        /// </summary>
+        /// <param name="volume">Объем позиции, для которого надо определить цену продажи</param>
+        /// <returns></returns>
         private decimal GetPriceSell(decimal volume)
         {
             // проверка на корректность переданного объема, на наличие и актуальность стакана
@@ -715,13 +743,4 @@ namespace OsEngine.Robots.OnScriptIndicators
             }
         }
     }
-
-    // тип сигнала выхода из позиции
-    enum SignalTypeClose
-    {
-        Bollinger,
-        TrailingStop,
-        BreakevenStop
-    }
-
 }
