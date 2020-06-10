@@ -308,7 +308,7 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="position">Позиция, которая проверяется на условия выхода</param>
         private void OutOfPositionByBollinger(Position position)
         {
-            // условие закрытия шорта (пробитие ценой противоположного болинджера)
+            // основное условие закрытия шорта (пробитие ценой противоположного болинджера)
             if (position.Direction == Side.Sell &&
                 lastPrice > upBollinger)
             {
@@ -322,7 +322,15 @@ namespace OsEngine.Robots.OnScriptIndicators
                 }
             }
 
-            // условие закрытия лонга (пробитие ценой противоположного болинджера)
+            // дополнительное условие закрытие прибыльного шорта при возврате в канал болинджера
+            if(position.Direction == Side.Sell &&
+                lastPrice > downBollinger &&
+                position.ProfitOperationPersent > 3)
+            {
+                CloseShort(position);
+            }
+
+            // основное условие закрытия лонга (пробитие ценой противоположного болинджера)
             if (position.Direction == Side.Buy &&
                 lastPrice < downBollinger)
             {
@@ -334,6 +342,14 @@ namespace OsEngine.Robots.OnScriptIndicators
                 {
                     OpenShort();
                 }
+            }
+
+            // дополнительное условие закрытие прибыльного лонга при возврате в канал болинджера
+            if (position.Direction == Side.Buy &&
+                lastPrice < upBollinger &&
+                position.ProfitOperationPersent > 3)
+            {
+                CloseLong(position);
             }
 
             return;
