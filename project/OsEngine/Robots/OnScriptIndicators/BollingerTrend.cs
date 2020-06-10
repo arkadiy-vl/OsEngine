@@ -38,6 +38,9 @@ namespace OsEngine.Robots.OnScriptIndicators
         // способ выхода из позиции: реверс, стоп
         public StrategyParameterString MethodOutOfPosition;
 
+        // разрешить дополнительное условие выхода из прибыльной позиции при возврате в канал болинджера
+        public StrategyParameterBool OnAdditionalConditionOutOfPosition;
+
         // величина трейлинг стопа
         public StrategyParameterInt TrailingStopPercent;
 
@@ -108,6 +111,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             Slippage = CreateParameter("Проскальзывание (в шагах цены)", 350, 1, 500, 50);
             VolumeDecimals = CreateParameter("Кол. знаков после запятой для объема", 4, 4, 10, 1);
             MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "Bollinger-Revers", new[] { "Bollinger-Revers", "Bollinger-TrailingStop" });
+            OnAdditionalConditionOutOfPosition = CreateParameter("Разрешить доп. условие выхода из прибыльной позиции", false);
             TrailingStopPercent = CreateParameter("Трейлинг стоп (%)", 5, 5, 15, 1);
             OnStopForBreakeven = CreateParameter("Вкл. стоп для перевода в безубытк", true);
             MinProfitOnStopBreakeven = CreateParameter("Мин. профит для перевода в безубытк (%)", 7, 5, 20, 1);
@@ -321,17 +325,8 @@ namespace OsEngine.Robots.OnScriptIndicators
                     OpenLong();
                 }
             }
-
-            // дополнительное условие закрытие прибыльного шорта при возврате в канал болинджера
-            if(position.Direction == Side.Sell &&
-                lastPrice > downBollinger &&
-                position.ProfitOperationPersent > 3)
-            {
-                CloseShort(position);
-            }
-
             // основное условие закрытия лонга (пробитие ценой противоположного болинджера)
-            if (position.Direction == Side.Buy &&
+            else if (position.Direction == Side.Buy &&
                 lastPrice < downBollinger)
             {
                 CloseLong(position);
@@ -344,12 +339,23 @@ namespace OsEngine.Robots.OnScriptIndicators
                 }
             }
 
-            // дополнительное условие закрытие прибыльного лонга при возврате в канал болинджера
-            if (position.Direction == Side.Buy &&
+            // дополнительное условие закрытие прибыльной позиции при возврате в канал болинджера
+            if (OnAdditionalConditionOutOfPosition.ValueBool)
+            {
+                // доп. условие закрытие прибыльного шорта
+                if (position.Direction == Side.Sell &&
+                lastPrice > downBollinger &&
+                position.ProfitOperationPersent > 3)
+                {
+                    CloseShort(position);
+                }
+                // доп. условие закрытие прибыльного лонга
+                else if (position.Direction == Side.Buy &&
                 lastPrice < upBollinger &&
                 position.ProfitOperationPersent > 3)
-            {
-                CloseLong(position);
+                {
+                    CloseLong(position);
+                }
             }
 
             return;
