@@ -26,6 +26,15 @@ namespace OsEngine.Robots.OnScriptIndicators
         // отклонение индикатора Bollinger
         public StrategyParameterDecimal BollingerDeviation;
 
+        // разрешить фильтр входа в позицию по индикатору ADX
+        public StrategyParameterBool OnFilterADX;
+        
+        // длина индикатора ADX
+        public StrategyParameterInt ADXLength;
+
+        // уровень индикатора ADX, определяющий наличие тренда 
+        public StrategyParameterInt ADXTrendLevel;
+
         // объём для входа в позицию
         public StrategyParameterInt VolumePercent;
 
@@ -64,6 +73,7 @@ namespace OsEngine.Robots.OnScriptIndicators
 
         // индикаторы для робота
         private Aindicator bollinger;
+        private Aindicator adx;
 
         // последняя цена
         private decimal lastPrice;
@@ -72,9 +82,10 @@ namespace OsEngine.Robots.OnScriptIndicators
         private decimal highLastCandle;
         private decimal lowLastCandle;
 
-        // последний верхний и нижний болинджер
+        // последний верхний, нижний болинджер и ADX
         private decimal upBollinger;
         private decimal downBollinger;
+        private decimal lastADX;
 
         // последний стакан
         private MarketDepth lastMarketDepth;
@@ -107,6 +118,9 @@ namespace OsEngine.Robots.OnScriptIndicators
             OnDebug = CreateParameter("Включить отладку", false);
             BollingerLength = CreateParameter("Длина болинжера", 100, 50, 200, 10);
             BollingerDeviation = CreateParameter("Отклонение болинжера", 1.5m, 1.0m, 3.0m, 0.2m);
+            OnFilterADX = CreateParameter("Включить фильтр входа в позицию по ADX", false);
+            ADXLength = CreateParameter("Длина ADX", 21, 10, 100, 10);
+            ADXTrendLevel = CreateParameter("Уровень тренда индикатора ADX", 20, 15, 25, 1);
             VolumePercent = CreateParameter("Объем входа в позицию (%)", 50, 40, 300, 10);
             Slippage = CreateParameter("Проскальзывание (в шагах цены)", 350, 1, 500, 50);
             VolumeDecimals = CreateParameter("Кол. знаков после запятой для объема", 4, 4, 10, 1);
@@ -123,6 +137,11 @@ namespace OsEngine.Robots.OnScriptIndicators
             bollinger.ParametersDigit[0].Value = BollingerLength.ValueInt;
             bollinger.ParametersDigit[1].Value = BollingerDeviation.ValueDecimal;
             bollinger.Save();
+
+            adx = IndicatorsFactory.CreateIndicatorByName("ADX", name + "Bollinger", false);
+            adx = (Aindicator)tab.CreateCandleIndicator(adx, "Second");
+            adx.ParametersDigit[0].Value = ADXLength.ValueInt;
+            adx.Save();
 
             // подписываемся на события
             tab.CandleFinishedEvent += Tab_CandleFinishedEvent;
@@ -160,6 +179,12 @@ namespace OsEngine.Robots.OnScriptIndicators
                 bollinger.ParametersDigit[1].Value = BollingerDeviation.ValueDecimal;
                 bollinger.Reload();
             }
+
+            if(adx.ParametersDigit[0].Value != ADXLength.ValueInt)
+            {
+                adx.ParametersDigit[0].Value = ADXLength.ValueInt;
+                adx.Reload();
+            }
         }
 
         /// <summary>
@@ -173,12 +198,14 @@ namespace OsEngine.Robots.OnScriptIndicators
                 return;
             }
 
-            // сохраняем длину болинджера для удобства
+            // сохраняем длину болинджера и ADX для сокращения объема кода
             int lengthBollinger = (int)bollinger.ParametersDigit[0].Value;
+            int lenghtADX = (int)adx.ParametersDigit[0].Value;
 
-            // проверка на достаточное количество свечек и наличие данных в болинджере
+            // проверка на достаточное количество свечек и наличие данных в болинджере и ADX
             if (candles == null || candles.Count < lengthBollinger + 2 ||
-                bollinger.DataSeries[0].Values == null || bollinger.DataSeries[1].Values == null)
+                bollinger.DataSeries[0].Values == null || bollinger.DataSeries[1].Values == null ||
+                adx.DataSeries[0].Values == null)
             {
                 return;
             }
@@ -189,12 +216,13 @@ namespace OsEngine.Robots.OnScriptIndicators
             lowLastCandle = candles[candles.Count - 1].Low;
             upBollinger = bollinger.DataSeries[0].Values[bollinger.DataSeries[0].Values.Count - 2];
             downBollinger = bollinger.DataSeries[1].Values[bollinger.DataSeries[1].Values.Count - 2];
+            lastADX = adx.DataSeries[0].Values[adx.DataSeries[0].Values.Count - 1];
 
             // проверка на корректность последних значений цены и болинджера
-            if (lastPrice <= 0 || upBollinger <= 0 || downBollinger <= 0)
+            if (lastPrice <= 0 || upBollinger <= 0 || downBollinger <= 0 || lastADX <= 0)
             {
                 if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage("Отладка. Сработало условие - цена или линии болинждера" +
+                    tab.SetNewLogMessage("Отладка. Сработало условие - цена или линии болинждера или ADX" +
                         " меньше или равны нулю.", Logging.LogMessageType.User);
                 return;
             }
@@ -258,12 +286,26 @@ namespace OsEngine.Robots.OnScriptIndicators
                 // условие входа в лонг (пробитие ценой верхнего болинджера)
                 if (lastPrice > upBollinger && Regime.ValueString != "OnlyShort")
                 {
-                    OpenLong();
+                    if (!OnFilterADX.ValueBool)
+                    {
+                        OpenLong();
+                    }
+                    else if (lastADX > ADXTrendLevel.ValueInt)
+                    {
+                        OpenLong();
+                    }
                 }
                 // условие входа в шорт (пробитие ценой нижнего болинджера)
                 else if (lastPrice < downBollinger && Regime.ValueString != "OnlyLong")
                 {
-                    OpenShort();
+                    if (!OnFilterADX.ValueBool)
+                    {
+                        OpenShort();
+                    }
+                    else if (lastADX > ADXTrendLevel.ValueInt)
+                    {
+                        OpenShort();
+                    }
                 }
             }
 
@@ -656,30 +698,30 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <returns>Цена входа в позицию</returns>
         private decimal GetPriceBuy(decimal volume)
         {
-            // проверка на корректность переданного объема, на наличие и актуальность стакана
-            if (volume <= 0 ||
-                lastMarketDepth.Asks == null ||
-                lastMarketDepth.Asks.Count < 2 ||
-                lastMarketDepth.Time.AddHours(shiftTimeExchange).AddSeconds(MarketDepthRelevanceTime) < DateTime.Now)
-            {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceBuy: некорректный объем или стакан.", Logging.LogMessageType.User);
-
-                return 0.0m;
-            }
-
-            // цена покупки
-            decimal priceBuy = 0.0m;
-
             // если робот запущен в терминале, то находим цену покупки из стакана
             if (startProgram.ToString() == "IsOsTrader")
             {
+                // цена покупки
+                decimal priceBuy = 0.0m;
+
                 // резерв по уровням стакана,
                 // т.е. насколько уровней выше, чем посчитали, берем цену из станкана
                 int reservLevelAsks = 1;
 
                 // максимально отклонение полученной из стакана цены покупки от лучшего Ask в стакане(в процентах)
                 int maxPriceDeviation = 5;
+
+                // проверка на корректность переданного объема, на наличие и актуальность стакана
+                if (volume <= 0 ||
+                    lastMarketDepth.Asks == null ||
+                    lastMarketDepth.Asks.Count < 2 ||
+                    lastMarketDepth.Time.AddHours(shiftTimeExchange).AddSeconds(MarketDepthRelevanceTime) < DateTime.Now)
+                {
+                    if (OnDebug.ValueBool)
+                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceBuy: некорректный объем или стакан.", Logging.LogMessageType.User);
+
+                    return 0.0m;
+                }
 
                 // обходим Asks в стакане на глубину анализа стакана
                 for (int i = 0;
@@ -716,28 +758,29 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <returns></returns>
         private decimal GetPriceSell(decimal volume)
         {
-            // проверка на корректность переданного объема, на наличие и актуальность стакана
-            if (volume <= 0 || lastMarketDepth.Bids == null || lastMarketDepth.Bids.Count < 2 || lastMarketDepth.Time.AddHours(shiftTimeExchange).AddSeconds(MarketDepthRelevanceTime) < DateTime.Now)
-            {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceSell: некорректный объем или стакан.", Logging.LogMessageType.User);
-
-                return 0.0m;
-            }
-
-            // цена продажи
-            decimal priceSell = 0.0m;
-
             // если робот запущен в терминале, то находим цену продажи из стакана
             if (startProgram.ToString() == "IsOsTrader")
             {
+                // цена продажи
+                decimal priceSell = 0.0m;
+
                 // резерв по уровням стакана,
                 // т.е. насколько уровней выше, чем посчитали, берем цену из стакана
                 int reservLevelBids = 1;
 
                 // максимально отклонение полученной из стакана цены продажи от лучшего Bid в стакане(в процентах)
                 int maxPriceDeviation = 5;
-                
+
+                // проверка на корректность переданного объема, на наличие и актуальность стакана
+                if (volume <= 0 || lastMarketDepth.Bids == null || lastMarketDepth.Bids.Count < 2 || lastMarketDepth.Time.AddHours(shiftTimeExchange).AddSeconds(MarketDepthRelevanceTime) < DateTime.Now)
+                {
+                    if (OnDebug.ValueBool)
+                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceSell: некорректный объем или стакан.", Logging.LogMessageType.User);
+
+                    return 0.0m;
+                }
+
+                // обходим Bids в стакане на глубину анализа стакана
                 for (int i = 0; 
                     i < lastMarketDepth.Bids.Count - reservLevelBids && i < MaxLevelsInMarketDepth;
                     i++)
