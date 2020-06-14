@@ -20,6 +20,18 @@ namespace OsEngine.Robots.OnScriptIndicators
         // режим отладки
         public StrategyParameterBool OnDebug;
 
+        // включить режим фиксированного депозита
+        public StrategyParameterBool OnDepositFixed;
+
+        // размер фиксированного депозита
+        public StrategyParameterDecimal DepositFixedSize;
+
+        // код имени инструмента, в котором имеем депозит
+        public StrategyParameterString DepositNameCode;
+
+        // объём для входа в позицию
+        public StrategyParameterInt VolumePercent;
+
         // длина индикатора Bollinger
         public StrategyParameterInt BollingerPeriod;
 
@@ -35,15 +47,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         // уровень индикатора ADX, определяющий наличие тренда 
         public StrategyParameterInt AdxLevel;
 
-        // объём для входа в позицию
-        public StrategyParameterInt VolumePercent;
-
-        // проскальзывание в шагах цены
-        public StrategyParameterInt Slippage;
-
-        // число знаков после запятой для вычисления объема входа в позицию
-        public StrategyParameterInt VolumeDecimals;
-
         // способ выхода из позиции: реверс, стоп
         public StrategyParameterString MethodOutOfPosition;
 
@@ -56,8 +59,11 @@ namespace OsEngine.Robots.OnScriptIndicators
         // минимальный профит в процентах для выставления стопа перевода позиции в безубыток
         public StrategyParameterInt MinProfitOnStopBreakeven;
 
-        // код имени инструмента, в котором имеем депозит
-        public StrategyParameterString DepositNameCode;
+        // проскальзывание в шагах цены
+        public StrategyParameterInt Slippage;
+
+        // число знаков после запятой для вычисления объема входа в позицию
+        public StrategyParameterInt VolumeDecimals;
 
         // разность по времени в часах между временем на сервере, где запущен бот, и временем на бирже
         public StrategyParameterInt ShiftTimeExchange;
@@ -126,19 +132,21 @@ namespace OsEngine.Robots.OnScriptIndicators
             // создаем настроечные параметры робота
             Regime = CreateParameter("Режим работы бота", "Off", new[] { "On", "Off", "OnlyClosePosition", "OnlyShort", "OnlyLong" });
             OnDebug = CreateParameter("Включить отладку", false);
+            OnDepositFixed = CreateParameter("Включить режим фикс. депозита", false);
+            DepositFixedSize = CreateParameter("Размер фикс. депозита", 100, 100.0m, 100, 100);
+            DepositNameCode = CreateParameter("Код инструмента, в котором депозит", "USDT", new[] { "USDT", ""});
+            VolumePercent = CreateParameter("Объем входа в позицию (%)", 50, 40, 300, 10);
             BollingerPeriod = CreateParameter("Длина болинжера", 100, 50, 200, 10);
             BollingerDeviation = CreateParameter("Отклонение болинжера", 1.5m, 1.0m, 3.0m, 0.2m);
             OnFilterAdx = CreateParameter("Включить фильтр входа в позицию по ADX", false);
             AdxPeriod = CreateParameter("Длина ADX", 10, 5, 35, 5);
             AdxLevel = CreateParameter("Уровень тренда индикатора ADX", 24, 14, 30, 2);
-            VolumePercent = CreateParameter("Объем входа в позицию (%)", 50, 40, 300, 10);
-            Slippage = CreateParameter("Проскальзывание (в шагах цены)", 350, 1, 500, 50);
-            VolumeDecimals = CreateParameter("Кол. знаков после запятой для объема", 4, 4, 10, 1);
             MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "Bollinger-Revers", new[] { "Bollinger-Revers", "Bollinger-TrailingStop" });
             TrailingStopPercent = CreateParameter("Трейлинг стоп (%)", 5, 5, 15, 1);
             OnStopForBreakeven = CreateParameter("Вкл. стоп для перевода в безубытк", true);
             MinProfitOnStopBreakeven = CreateParameter("Мин. профит для перевода в безубытк (%)", 7, 5, 20, 1);
-            DepositNameCode = CreateParameter("Код имени инструмента, в котором депозит", "USDT", new[] { "USDT", "" });
+            Slippage = CreateParameter("Проскальзывание (в шагах цены)", 350, 1, 500, 50);
+            VolumeDecimals = CreateParameter("Кол. знаков после запятой для объема", 4, 4, 10, 1);
             ShiftTimeExchange = CreateParameter("Разница времени с биржей", 5, -10, 10, 1);
 
             // создаем индикаторы на вкладке робота и задаем для них параметры
@@ -839,9 +847,14 @@ namespace OsEngine.Robots.OnScriptIndicators
             // объем позиции
             decimal volumePosition = 0.0m;
 
-            // если робот запущен в терминале и депозит на площадке может быть в разных денежных единицах,
+            // если включен режим фиксированного депозита, то задаем фиксированное значение депозита из настроек
+            if (OnDepositFixed.ValueBool)
+            {
+                depositValue = DepositFixedSize.ValueDecimal;
+            }
+            // если робот запущен в терминале и задан код денежной единцы для депозита
             // то получаем  с биржи размер депозита в инструменте securityNameCode 
-            if (startProgram.ToString() == "IsOsTrader" && securityNameCode != "")
+            else if (startProgram.ToString() == "IsOsTrader" && securityNameCode != "")
             {
                 depositValue = tab.Portfolio.GetPositionOnBoard().Find(pos => pos.SecurityNameCode == securityNameCode).ValueCurrent;
             }
