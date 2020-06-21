@@ -717,6 +717,7 @@
       <DependentUpon>PairTraderSimpleUi.xaml</DependentUpon>
     </Compile>
     <Compile Include="Robots\OnScriptIndicators\ArbitrageOneLeg.cs" />
+    <Compile Include="Robots\OnScriptIndicators\ArbitrageTwoLeg.cs" />
     <Compile Include="Robots\OnScriptIndicators\BbPowerTrade.cs" />
     <Compile Include="Robots\OnScriptIndicators\BollingerRevers.cs" />
     <Compile Include="Robots\OnScriptIndicators\BollingerTrailing.cs" />
