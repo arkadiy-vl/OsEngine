@@ -43,6 +43,12 @@ namespace OsEngine.Robots.OnScriptIndicators
         // число знаков после запятой для вычисления объема входа в позицию
         public StrategyParameterInt VolumeDecimals;
 
+        // фильтр спреда
+        public StrategyParameterString FilterIndex;
+
+        // период ZScore фильтра спреда
+        public StrategyParameterInt PeriodZscoreFilter;
+
         // индикатор, используемый для построения канала тренда
         public StrategyParameterString ChannelIndicator;
 
@@ -60,6 +66,10 @@ namespace OsEngine.Robots.OnScriptIndicators
         // параметры индикатора IvashovRange, используется для построения канала спреда
         public StrategyParameterInt IvrangePeriod;
         public StrategyParameterInt IvrangeMAPeriod;
+
+        // параметры фиксированного канала спреда
+        public StrategyParameterDecimal FixedLevelUp;
+        public StrategyParameterDecimal FixedLevelDown;
 
         // способ выхода из позиции: реверс, стоп
         public StrategyParameterString MethodOutOfPosition;
@@ -157,14 +167,18 @@ namespace OsEngine.Robots.OnScriptIndicators
             VolumePercent2 = CreateParameter("Объем входа в позицию для инструмента 2 (%)", 50, 40, 300, 10);
             KoefCorelation = CreateParameter("Коэф. корреляции между инстр.1 и инстр. 2", 1, 1.0m, 1, 1);
 
-            ChannelIndicator = CreateParameter("Channel Indicator", "Bollinger", new[] { "Bollinger", "MA+ATR", "MA+IvashovRange" });
-            MAPeriod = CreateParameter("Period MA", 20, 20, 100, 10);
-            BollingerPeriod = CreateParameter("Period Bollinger", 40, 40, 200, 20);
-            BollingerDeviation = CreateParameter("Deviation Bollinger", 1, 0.5m, 2.0m, 0.5m);
-            AtrPeriod = CreateParameter("Period ATR", 20, 20, 100, 10);
-            AtrKoef = CreateParameter("Koef. ATR", 1, 1, 5, 0.5m);
-            IvrangePeriod = CreateParameter("Period Ivashov Range", 20, 10, 50, 10);
-            IvrangeMAPeriod = CreateParameter("Period MA Ivashov Range", 20, 10, 50, 10);
+            FilterIndex = CreateParameter("Фильтр спреда", "No", new[] { "No", "ZScore" });
+            PeriodZscoreFilter = CreateParameter("Период ZScore", 5, 3, 12, 1);
+            ChannelIndicator = CreateParameter("Индикаторы для канала спреда", "Bollinger", new[] { "Bollinger", "MA+ATR", "MA+IvashovRange", "Fixed" });
+            MAPeriod = CreateParameter("Период MA", 20, 20, 100, 10);
+            BollingerPeriod = CreateParameter("Период Bollinger", 40, 40, 200, 20);
+            BollingerDeviation = CreateParameter("Отклонение Bollinger", 1, 0.5m, 2.0m, 0.5m);
+            AtrPeriod = CreateParameter("Период ATR", 20, 20, 100, 10);
+            AtrKoef = CreateParameter("Коэффициент ATR", 1, 1, 5, 0.5m);
+            IvrangePeriod = CreateParameter("Период IvashovRange", 20, 10, 50, 10);
+            IvrangeMAPeriod = CreateParameter("Период MA IvashovRange", 20, 10, 50, 10);
+            FixedLevelUp = CreateParameter("Верх. уровень фикс. канала", 2, 1.0m, 3, 0.2m);
+            FixedLevelDown = CreateParameter("Верх. уровень фикс. канала", -2, -1.0m, -3, -0.2m);
 
             Slippage = CreateParameter("Проскальзывание (в шагах цены)", 350, 1, 500, 50);
             VolumeDecimals = CreateParameter("Кол. знаков после запятой для объема", 4, 4, 10, 1);
@@ -215,7 +229,7 @@ namespace OsEngine.Robots.OnScriptIndicators
 
             ParametrsChangeByUser += ArbitrageTwoLeg_ParametrsChangeByUser;
         }
-       
+
 
         /// <summary>
         /// Сервисный метод получения названия робота
@@ -274,6 +288,7 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="candlesIndex">Свечи индекса</param>
         private void TabIndex_SpreadChangeEvent(List<Candle> candles)
         {
+            // проверяем, что робот включен
             if (Regime.ValueString == "Off")
             {
                 return;
@@ -323,12 +338,13 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="candles">Список свечей</param>
         private void TabTrade1_CandleFinishedEvent(List<Candle> candles)
         {
+            // проверяем, что робот включен
             if (Regime.ValueString == "Off")
             {
                 return;
             }
 
-            //Проверяем, что вкладки для индекса и второго торгуемого инструмента подключены
+            // проверяем, что вкладки для индекса и второго торгуемого инструмента подключены
             if (tabIndex.IsConnected == false ||
                 tabTrade2.IsConnected == false)
             {
@@ -348,6 +364,7 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="candles">Список свечей</param>
         private void TabTrade2_CandleFinishedEvent(List<Candle> candles)
         {
+            // проверяем, что робот включен
             if (Regime.ValueString == "Off")
             {
                 return;
@@ -373,19 +390,21 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="marketDepth">Полученный стакан</param>
         private void TabTrade1_MarketDepthUpdateEvent(MarketDepth marketDepth)
         {
+            // проверка, что робот включен
             if (Regime.ValueString == "Off")
             {
                 return;
             }
 
             // проверка корректности полученного стакана
-            if (marketDepth.Asks != null && marketDepth.Asks.Count != 0 &&
-                marketDepth.Bids != null && marketDepth.Bids.Count != 0)
+            if (marketDepth.Asks == null || marketDepth.Asks.Count == 0 ||
+                marketDepth.Bids == null || marketDepth.Bids.Count == 0)
             {
-                // просто сохраняем в роботе полученный стакан, чтобы он всегда был актуальный
-                lastMarketDepth1 = marketDepth;
+                return;
             }
 
+            // просто сохраняем в роботе полученный стакан, чтобы он всегда был актуальный
+            lastMarketDepth1 = marketDepth;
             return;
         }
 
@@ -395,19 +414,21 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="marketDepth">Полученный стакан</param>
         private void TabTrade2_MarketDepthUpdateEvent(MarketDepth marketDepth)
         {
+            // проверка, что робот включен
             if (Regime.ValueString == "Off")
             {
                 return;
             }
 
             // проверка корректности полученного стакана
-            if (marketDepth.Asks != null && marketDepth.Asks.Count != 0 &&
-                marketDepth.Bids != null && marketDepth.Bids.Count != 0)
+            if (marketDepth.Asks == null || marketDepth.Asks.Count == 0 ||
+                marketDepth.Bids == null || marketDepth.Bids.Count == 0)
             {
-                // просто сохраняем в роботе полученный стакан, чтобы он всегда был актуальный
-                lastMarketDepth2 = marketDepth;
+                return;
             }
 
+            // просто сохраняем в роботе полученный стакан, чтобы он всегда был актуальный
+            lastMarketDepth2 = marketDepth;
             return;
         }
 
@@ -428,6 +449,12 @@ namespace OsEngine.Robots.OnScriptIndicators
             lastAtr = atr.Values[atr.Values.Count - 1];
             lastIvrange = ivrange.Values[ivrange.Values.Count - 1];
 
+            // если включен фильтр спреда, то фильтруем индекс
+            if (FilterIndex.ValueString == "ZScore")
+            {
+                //не реализовано, надо делать индикатор ZScore
+            }
+
             // в зависимости от настроек сохраняем получаем канал спреда
             if (ChannelIndicator.ValueString == "Bollinger")
             {
@@ -444,6 +471,11 @@ namespace OsEngine.Robots.OnScriptIndicators
                 lastChannelUp = lastMA + lastIvrange;
                 lastChannelDown = lastMA - lastIvrange;
             }
+            else if (ChannelIndicator.ValueString == "Fixed")
+            {
+                lastChannelUp = FixedLevelUp.ValueDecimal;
+                lastChannelDown = FixedLevelDown.ValueDecimal;
+            }
             else
             {
                 lastChannelUp = lastBollingerUp;
@@ -451,8 +483,13 @@ namespace OsEngine.Robots.OnScriptIndicators
             }
 
             // получаем все открытые позиции для каждого торгуемого инструмента
-            Position position1 = tabTrade1.PositionsOpenAll[0];
-            Position position2 = tabTrade2.PositionsOpenAll[0];
+            List<Position> openPositions1 = tabTrade1.PositionsOpenAll;
+            List<Position> openPositions2 = tabTrade2.PositionsOpenAll;
+
+            // для удобства сохраняем первую открытую позицию для каждого инструмента
+            Position position1 = openPositions1[0];
+            Position position2 = openPositions2[0];
+
             decimal volumePosition1 = 0.0m;
             decimal pricePosition1 = 0.0m;
             decimal pricePositionWithSlippage1 = 0.0m;
@@ -460,18 +497,147 @@ namespace OsEngine.Robots.OnScriptIndicators
             decimal pricePosition2 = 0.0m;
             decimal pricePositionWithSlippage2 = 0.0m;
 
+            // если количество открытых позиций по одному из инструментов больше 1,
+            // то это ошибка, закрываем все ордера и открытые позиции по маркету
+            // робот должен входить только в одну позицию по каждому инструменту
+            if (openPositions1.Count > 1 || openPositions2.Count > 1)
+            {
+                // отзываем все ордера
+                tabTrade1.CloseAllOrderInSystem();
+                tabTrade2.CloseAllOrderInSystem();
+                System.Threading.Thread.Sleep(2000);
+
+                // снимаем флаг входа в позицию
+                signalIn = false;
+                
+                // закрываем все открытые позиции по инструменту 1
+                if (openPositions1.Count > 0)
+                {
+                    signalOut1 = true;
+                    tabTrade1.CloseAllAtMarket();
+                }
+
+                // закрываем все открытые позиции по инструменту 2
+                if (openPositions2.Count > 0)
+                {
+                    signalOut2 = true;
+                    tabTrade2.CloseAllAtMarket();
+                }
+
+                if (OnDebug.ValueBool)
+                {
+                    tabTrade1.SetNewLogMessage($"Отладка. tabTrade1. Ошибка - количество открытых позиций больше 1. Закрываем все открытые позиции по маркету и выключаем робота.", Logging.LogMessageType.User);
+                    tabTrade2.SetNewLogMessage($"Отладка. tabTrade2. Ошибка - количество открытых позиций больше 1. Закрываем все открытые позиции по маркету и выключаем робота.", Logging.LogMessageType.User);
+                }
+
+                // выключаем робота
+                Regime.ValueString = "Off";
+
+                return;
+            }
+
+            // если есть одна открытая позиция по каждому инструменту,
+            // то проверяем возможность закрытия данных позиций
+            if (openPositions1.Count == 1 && position1.State == PositionStateType.Open &&
+                openPositions2.Count == 1 && position2.State == PositionStateType.Open)
+            {
+                // если находимся в покупке спреда и пробиваем канал спреда вверх, то закрываем покупку спреда:
+                // закрываем лонг по инструменту 1 (продаем),
+                // закрываем шорт по инструменту 2 (покупаем)
+                if (position1.Direction == Side.Buy && lastIndex > lastChannelUp)
+                {
+                    volumePosition1 = position1.OpenVolume;
+                    pricePosition1 = GetPriceSell(tabTrade1, volumePosition1);
+                    pricePositionWithSlippage1 = pricePosition1 - Slippage.ValueInt * tabTrade1.Securiti.PriceStep;
+
+                    if (pricePosition1 > 0)
+                    {
+                        // выставляем лимитный ордер на закрытие лонга по инструменту 1
+                        tabTrade1.CloseAtLimit(position1, pricePositionWithSlippage1, volumePosition1);
+                        if (OnDebug.ValueBool)
+                        {
+                            tabTrade1.SetNewLogMessage($"Отладка. tabTrade1. Закрытие лонга по лимиту: объем - {volumePosition1}, цена - {pricePosition1}, цена с проск. - {pricePositionWithSlippage1}.", Logging.LogMessageType.User);
+                            
+                        }
+                    }
+                    else
+                    {
+                        // выставляем рыночный ордер на закрытие лонга по инструменту 1
+                        tabTrade1.CloseAtMarket(position1,volumePosition1);
+                        if (OnDebug.ValueBool)
+                        {
+                            tabTrade1.SetNewLogMessage($"Отладка. tabTrade1. Закрытие лонга по лимиту: объем - {volumePosition1}, цена - {pricePosition1}, цена с проск. - {pricePositionWithSlippage1}.", Logging.LogMessageType.User);
+                            
+                        }
+                    }
+
+                    // устанавливаем флаг выхода из позиции по инструменту 1
+                    signalOut1 = true;
+
+
+
+                    volumePosition2 = position2.OpenVolume;
+                    pricePosition2 = GetPriceBuy(tabTrade2, volumePosition2);
+                    pricePositionWithSlippage2 = pricePosition2 + Slippage.ValueInt * tabTrade2.Securiti.PriceStep;
+
+                    if (pricePosition2 > 0)
+                    {
+                        // выставляем лимитный ордер на закрытие шорта по инструменту 2
+                        tabTrade2.CloseAtLimit(position2, pricePositionWithSlippage2, volumePosition2);
+                    }
+                    else
+                    {
+                        // выставляем рыночный ордер на закрытие шорта по инструменту 2
+                        tabTrade2.CloseAtMarket(position2, volumePosition2);
+                    }
+                    
+                    // устанавливаем флаг выхода из позиции по инструменту 2
+                    signalOut2 = true;
+
+                   
+
+                }
+                // иначе, если находимся в продаже спреда и пробиваем канал спреда вниз, то закрываем продажу спреда:
+                // закрываем шорт по инструменту 1 (покупаем),
+                // закрываем лонг по инструменту 2 (продаем)
+                else if (position1.Direction == Side.Sell && lastIndex < lastChannelDown)
+                {
+                    volumePosition1 = position1.OpenVolume;
+                    pricePosition1 = GetPriceBuy(tabTrade1, volumePosition1);
+                    pricePositionWithSlippage1 = pricePosition1 + Slippage.ValueInt * tabTrade1.Securiti.PriceStep;
+
+                    // выставляем лимитный ордер на закрытие лонга по инструменту 1
+                    tabTrade1.CloseAtLimit(position1, pricePositionWithSlippage1, volumePosition1);
+                    signalOut1 = true;
+
+                    volumePosition2 = position2.OpenVolume;
+                    pricePosition2 = GetPriceSell(tabTrade2, volumePosition2);
+                    pricePositionWithSlippage2 = pricePosition2 - Slippage.ValueInt * tabTrade2.Securiti.PriceStep;
+
+                    // выставляем лимитный ордер на закрытие шорта по инструменту 2
+                    tabTrade2.CloseAtLimit(position2, pricePositionWithSlippage2, volumePosition2);
+                    signalOut2 = true;
+
+                    if (OnDebug.ValueBool)
+                    {
+                        tabTrade1.SetNewLogMessage($"Отладка. tabTrade1. Закрытие шорта по лимиту: объем - {volumePosition1}, цена - {pricePosition1}, цена с проск. - {pricePositionWithSlippage1}.", Logging.LogMessageType.User);
+                        tabTrade2.SetNewLogMessage($"Отладка. tabTrade2. Закрытие лонга по лимиту: объем - {volumePosition2}, цена - {pricePosition2}, цена с проск. - {pricePositionWithSlippage2}.", Logging.LogMessageType.User);
+                    }
+                }
+            }
+
             // если нет открытых позиций по обоим инструментам и разрешено открывать новые позиции,
             // то проверяем условия на открытие позиций
-            // робот входит только в одну пару позиций, вначале входит в инструмент 2, потом в инструмент 1
-            if (position1 == null && position2 == null &&
-                Regime.ValueString != "OnlyClosePosition")
+            // робот входит только в одну позицию по каждому инструменту,
+            // вначале входит в инструмент 2, потом в инструмент 1
+            else if (openPositions1.Count == 0 && openPositions2.Count == 0 && Regime.ValueString != "OnlyClosePosition")
             {
                 // если пробиваем канал спреда вверх, то продаем спред:
                 // открываем лонг по инструменту 2,
                 // открываем шорт по инструменту 1 после успешного открытия лонга по инструменту 2
                 if (lastIndex > lastChannelUp)
                 {
-                    // получаем объем позиции по лучшему предложению в стакане
+                    // получаем объем позиции по инструменту 2
                     volumePosition2 = GetVolumePosition(tabTrade2, tabTrade2.PriceBestAsk);
 
                     // получаем цену входа в позицию для покупки всего объема позиции
@@ -504,71 +670,6 @@ namespace OsEngine.Robots.OnScriptIndicators
                     if (OnDebug.ValueBool)
                         tabTrade2.SetNewLogMessage($"Отладка. tabTrade2. Открытие шорта по лимиту: объем - {volumePosition2}, цена - {pricePosition2}, цена с проск. - {pricePositionWithSlippage2}.", Logging.LogMessageType.User);
                 }
-
-                return;
-            }
-            // иначе, если есть открытые позиции по обоим инструментам,
-            // то проверяем возможность закрытия данных позиций
-            else if (position1 != null && position1.State == PositionStateType.Open &&
-                position2 != null && position2.State == PositionStateType.Open)
-            {
-                // если находимся в покупке спреда и пробиваем канал спреда вверх, то закрываем покупку спреда:
-                // закрываем лонг по инструменту 1 (продаем),
-                // закрываем шорт по инструменту 2 (покупаем)
-                if (position1.Direction == Side.Buy && lastIndex > lastChannelUp)
-                {
-                    volumePosition1 = position1.OpenVolume;
-                    pricePosition1 = GetPriceSell(tabTrade1, volumePosition1);
-                    pricePositionWithSlippage1 = pricePosition1 - Slippage.ValueInt * tabTrade1.Securiti.PriceStep;
-
-                    // выставляем лимитный ордер на закрытие лонга по инструменту 1
-                    tabTrade1.CloseAtLimit(position1, pricePositionWithSlippage1, volumePosition1);
-                    signalOut1 = true;
-
-                    volumePosition2 = position2.OpenVolume;
-                    pricePosition2 = GetPriceBuy(tabTrade2, volumePosition2);
-                    pricePositionWithSlippage2 = pricePosition2 + Slippage.ValueInt * tabTrade2.Securiti.PriceStep;
-
-                    // выставляем лимитный ордер на закрытие шорта по инструменту 2
-                    tabTrade2.CloseAtLimit(position2, pricePositionWithSlippage2, volumePosition2);
-                    signalOut2 = true;
-
-                    if (OnDebug.ValueBool)
-                    {
-                        tabTrade1.SetNewLogMessage($"Отладка. tabTrade1. Закрытие лонга по лимиту: объем - {volumePosition1}, цена - {pricePosition1}, цена с проск. - {pricePositionWithSlippage1}.", Logging.LogMessageType.User);
-                        tabTrade2.SetNewLogMessage($"Отладка. tabTrade2. Закрытие шорта по лимиту: объем - {volumePosition2}, цена - {pricePosition2}, цена с проск. - {pricePositionWithSlippage2}.", Logging.LogMessageType.User);
-                    }
-
-                }
-                // иначе, если находимся в продаже спреда и пробиваем канал спреда вниз, то закрываем продажу спреда:
-                // закрываем шорт по инструменту 1 (покупаем),
-                // закрываем лонг по инструменту 2 (продаем)
-                else if (position1.Direction == Side.Sell && lastIndex < lastChannelDown)
-                {
-                    volumePosition1 = position1.OpenVolume;
-                    pricePosition1 = GetPriceBuy(tabTrade1, volumePosition1);
-                    pricePositionWithSlippage1 = pricePosition1 + Slippage.ValueInt * tabTrade1.Securiti.PriceStep;
-
-                    // выставляем лимитный ордер на закрытие лонга по инструменту 1
-                    tabTrade1.CloseAtLimit(position1, pricePositionWithSlippage1, volumePosition1);
-                    signalOut1 = true;
-
-                    volumePosition2 = position2.OpenVolume;
-                    pricePosition2 = GetPriceSell(tabTrade2, volumePosition2);
-                    pricePositionWithSlippage2 = pricePosition2 - Slippage.ValueInt * tabTrade2.Securiti.PriceStep;
-
-                    // выставляем лимитный ордер на закрытие шорта по инструменту 2
-                    tabTrade2.CloseAtLimit(position2, pricePositionWithSlippage2, volumePosition2);
-                    signalOut2 = true;
-
-                    if (OnDebug.ValueBool)
-                    {
-                        tabTrade1.SetNewLogMessage($"Отладка. tabTrade1. Закрытие шорта по лимиту: объем - {volumePosition1}, цена - {pricePosition1}, цена с проск. - {pricePositionWithSlippage1}.", Logging.LogMessageType.User);
-                        tabTrade2.SetNewLogMessage($"Отладка. tabTrade2. Закрытие лонга по лимиту: объем - {volumePosition2}, цена - {pricePosition2}, цена с проск. - {pricePositionWithSlippage2}.", Logging.LogMessageType.User);
-                    }
-                }
-
-                return;
             }
         }
 
@@ -616,7 +717,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                     if (OnDebug.ValueBool)
                         tabTrade1.SetNewLogMessage($"Отладка. TabTrade1. Повторное открытие лонга {position1.Number} по маркету.", Logging.LogMessageType.User);
                 }
-                else if(position1.Direction == Side.Sell)
+                else if (position1.Direction == Side.Sell)
                 {
                     tabTrade1.SellAtMarketToPosition(position1, volumePosition1);
 
@@ -845,7 +946,7 @@ namespace OsEngine.Robots.OnScriptIndicators
         private decimal GetVolumePosition(BotTabSimple tab, decimal price, string securityNameCode = "")
         {
             // проверка на корректность переданных в метод параметров
-            if (tab != null && price <= 0)
+            if (tab == null || price <= 0)
             {
                 if (OnDebug.ValueBool)
                     tab.SetNewLogMessage($"Отладка. Сработало условие в GetVolumePosition: не существует вкладка или некорректное значение переданной цены.", Logging.LogMessageType.User);
@@ -888,11 +989,12 @@ namespace OsEngine.Robots.OnScriptIndicators
 
             // в зависимости от вкладки, вызвавшей данный метод, берем процент входа в позицию
             int volumePercent = 0;
+
             if (tab.TabName == "tabTrade1")
             {
                 // объем входа в позицию для инструмента 1 всегда вычисляется по объему открытой позиции по инструменту 2
                 if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. {tab.TabName}. Сработало условие в GetVolumePosition: запрос объема позиции по инструменту 1.", Logging.LogMessageType.User);
+                    tab.SetNewLogMessage($"Отладка. {tab.TabName}. Ошибка. Сработало условие в GetVolumePosition: запрос объема позиции по инструменту 1.", Logging.LogMessageType.User);
 
                 return 0.0m;
             }
