@@ -219,9 +219,9 @@ namespace OsEngine.Robots.OnScriptIndicators
             int adxPeriod = (int)adx.ParametersDigit[0].Value;
 
             // проверка на достаточное количество свечек и наличие данных в болинджере и ADX
-            if (candles == null || candles.Count < bollingerPeriod + 2 ||
+            if (candles == null || candles.Count < bollingerPeriod + 5 ||
                 bollinger.DataSeries[0].Values == null || bollinger.DataSeries[1].Values == null ||
-                candles.Count < adxPeriod + 2 || adx.DataSeries[0].Values == null)
+                candles.Count < adxPeriod + 5 || adx.DataSeries[0].Values == null)
             {
                 return;
             }
@@ -230,8 +230,8 @@ namespace OsEngine.Robots.OnScriptIndicators
             lastPrice = candles[candles.Count - 1].Close;
             highLastCandle = candles[candles.Count - 1].High;
             lowLastCandle = candles[candles.Count - 1].Low;
-            upBollinger = bollinger.DataSeries[0].Values[bollinger.DataSeries[0].Values.Count - 2];
-            downBollinger = bollinger.DataSeries[1].Values[bollinger.DataSeries[1].Values.Count - 2];
+            upBollinger = bollinger.DataSeries[0].Values[bollinger.DataSeries[0].Values.Count - 1];
+            downBollinger = bollinger.DataSeries[1].Values[bollinger.DataSeries[1].Values.Count - 1];
             lastAdx = adx.DataSeries[0].Values[adx.DataSeries[0].Values.Count - 1];
 
             // проверка на корректность последних значений цены и болинджера
@@ -283,13 +283,19 @@ namespace OsEngine.Robots.OnScriptIndicators
             // проверка возможности открытия позиции (робот открывает только одну позицию)
             if (openPositions.Count == 0)
             {
-                // условие входа в лонг (пробитие ценой верхнего болинджера) с учетом фильтра
-                if (lastPrice > upBollinger && filterInLong && Regime.ValueString != "OnlyShort")
+                // условие входа в лонг:
+                // пробитие ценой верхнего болинджера и с учетом фильтра
+                if (lastPrice > upBollinger &&
+                    candles[candles.Count - 2].Close < bollinger.DataSeries[0].Values[bollinger.DataSeries[0].Values.Count - 2] &&
+                    filterInLong && Regime.ValueString != "OnlyShort")
                 {
                     OpenLong();
                 }
-                // условие входа в шорт (пробитие ценой нижнего болинджера) с учетом фильтра
-                else if (lastPrice < downBollinger && filterInShort && Regime.ValueString != "OnlyLong")
+                // условие входа в шорт:
+                // пробитие ценой нижнего болинджера и с учетом фильтра
+                else if (lastPrice < downBollinger &&
+                    candles[candles.Count - 2].Close > bollinger.DataSeries[1].Values[bollinger.DataSeries[1].Values.Count - 2] &&
+                    filterInShort && Regime.ValueString != "OnlyLong")
                 {
                     OpenShort();
                 }
