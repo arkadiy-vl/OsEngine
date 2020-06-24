@@ -47,11 +47,8 @@ namespace OsEngine.Robots.OnScriptIndicators
         // уровень индикатора ADX, определяющий наличие тренда 
         public StrategyParameterInt AdxLevel;
 
-        // способ выхода из позиции: реверс, стоп
+        // способ выхода из позиции: по противоположной границе канала, по центру канала
         public StrategyParameterString MethodOutOfPosition;
-
-        // величина трейлинг стопа
-        public StrategyParameterInt TrailingStopPercent;
 
         // включить выставление стопов для перевода позиции в безубыток
         public StrategyParameterBool OnStopForBreakeven;
@@ -141,8 +138,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             OnFilterAdx = CreateParameter("Включить фильтр входа в позицию по ADX", false);
             AdxPeriod = CreateParameter("Длина ADX", 10, 5, 35, 5);
             AdxLevel = CreateParameter("Уровень тренда индикатора ADX", 24, 14, 30, 2);
-            MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "Bollinger-Revers", new[] { "Bollinger-Revers", "Bollinger-TrailingStop" });
-            TrailingStopPercent = CreateParameter("Трейлинг стоп (%)", 5, 5, 15, 1);
+            MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "ChannelBoundary", new[] { "ChannelBoundary", "ChannelCenter" });
             OnStopForBreakeven = CreateParameter("Вкл. стоп для перевода в безубытк", true);
             MinProfitOnStopBreakeven = CreateParameter("Мин. профит для перевода в безубытк (%)", 7, 5, 20, 1);
             Slippage = CreateParameter("Проскальзывание (в шагах цены)", 350, 1, 500, 50);
@@ -267,31 +263,8 @@ namespace OsEngine.Robots.OnScriptIndicators
                         continue;
                     }
 
-                    // если позиция уже закрывается, то ничего не делаем
-                    /*
-                    if (openPositions[i].State == PositionStateType.Closing ||
-                        openPositions[i].CloseActiv == true ||
-                        (openPositions[i].CloseOrders != null && openPositions[i].CloseOrders.Count > 0))
-                    {
-                        continue;
-                    }
-                    */
-
-                    // вариант выхода из позиции по пробою индикатора Болинжер
-                    if (MethodOutOfPosition.ValueString == "Bollinger-Revers")
-                    {
-                        OutOfPositionByBollinger(openPositions[i]);
-                    }
-                    // вариант выхода из позиции по трейлинг стопу
-                    else if (MethodOutOfPosition.ValueString == "Bollinger-TrailingStop")
-                    {
-                        SetTrailingStop(openPositions[i]);
-                    }
-                    // вариант выхода из позиции по умолчанию
-                    else
-                    {
-                        OutOfPositionByBollinger(openPositions[i]);
-                    }
+                    // выхода из позиции по пробою индикатора Болинжер
+                    OutOfPositionByBollinger(openPositions[i]);
 
                     // установка стопа для перевода позиции в безубыток
                     if (OnStopForBreakeven.ValueBool)
@@ -495,11 +468,14 @@ namespace OsEngine.Robots.OnScriptIndicators
         }
 
         /// <summary>
-        /// Метод выхода из позиции по трейлинг стопу (установка трейлинг стопа)
+        /// Установка трейлинг стопа (не используется в стратегии!)
         /// </summary>
-        /// <param name="position"></param>
+        /// <param name="position">Позиция для которой устанавливается трейлинг стоп</param>
         private void SetTrailingStop(Position position)
         {
+            // размер трейлинг стопа в процентах (при использовании трейлинг стопа в стратегии перенести в настроечные параметры)
+            int trailingStopPercent = 7;
+
             // цена активации стоп ордера
             decimal priceActivation;
 
@@ -509,9 +485,8 @@ namespace OsEngine.Robots.OnScriptIndicators
             // установка трейлинг стопа для позиции лонг
             if (position.Direction == Side.Buy)
             {
-                // цена активации ставится величину трейлинг стопа от максимума последней свечи
-                // или на последний нижний болинджер
-                priceActivation = Math.Max(lowLastCandle * (1 - TrailingStopPercent.ValueInt / 100.0m), bollinger.DataSeries[1].Last);
+                // цена активации ставится величину трейлинг стопа от минимума последней свечи
+                priceActivation = lowLastCandle * (1 - trailingStopPercent / 100.0m);
 
                 // цена стоп ордера ставится ниже на величину двух проскальзываний от цены активации
                 priceOrder = priceActivation - 2 * Slippage.ValueInt * tab.Securiti.PriceStep;
@@ -522,9 +497,8 @@ namespace OsEngine.Robots.OnScriptIndicators
             // установка трейлинг стопа для позиции шорт
             else if (position.Direction == Side.Sell)
             {
-                // цена активации ставится на величину трейлинг стопа от минимума последней свечи
-                // или на последний верхний болинджер
-                priceActivation = Math.Min(highLastCandle * (1.0m + TrailingStopPercent.ValueInt / 100.0m), bollinger.DataSeries[0].Last);
+                // цена активации ставится на величину трейлинг стопа от максимума последней свечи
+                priceActivation = highLastCandle * (1.0m + trailingStopPercent / 100.0m);
 
                 // цена стоп ордера ставится выше на величину двух проскальзываний от цены активации
                 priceOrder = priceActivation + 2 * Slippage.ValueInt * tab.Securiti.PriceStep;
