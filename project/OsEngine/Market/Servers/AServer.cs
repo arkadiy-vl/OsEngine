@@ -1371,8 +1371,7 @@ namespace OsEngine.Market.Servers
         /// take ticks data for a period
         /// взять тиковые данные за период
         /// </summary>
-        public bool GetTickDataToSecurity(string namePaper, DateTime startTime, DateTime endTime, DateTime actualTime,
-            bool neadToUpdete)
+        public bool GetTickDataToSecurity(string namePaper, DateTime startTime, DateTime endTime, DateTime actualTime, bool neadToUpdete)
         {
             if (Portfolios == null || Securities == null)
             {
@@ -1615,6 +1614,11 @@ namespace OsEngine.Market.Servers
         {
             try
             {
+                if (trade.Price <= 0)
+                {
+                    return;
+                }
+
                 if (_needToLoadBidAskInTrades.Value)
                 {
                     BathTradeMarketDepthData(trade);
@@ -1647,6 +1651,16 @@ namespace OsEngine.Market.Servers
                                 return;
                             }
 
+                            Trade tradeBeforeCur = _allTrades[i][_allTrades[i].Count - 1];
+
+                            if (tradeBeforeCur.SecurityNameCode != trade.SecurityNameCode ||
+                                (tradeBeforeCur.Time.AddMinutes(30) > trade.Time &&
+                                 (tradeBeforeCur.Price / trade.Price > 1.1m ||
+                                  tradeBeforeCur.Price / trade.Price < 0.9m)))
+                            {
+                                return;
+                            }
+
                             _allTrades[i].Add(trade);
                             myList = _allTrades[i];
                             isSave = true;
@@ -1667,8 +1681,6 @@ namespace OsEngine.Market.Servers
                         myList = allTradesNew[allTradesNew.Length - 1];
                         _allTrades = allTradesNew;
                     }
-
-
 
                     _tradesToSend.Enqueue(myList);
                 }
@@ -1801,7 +1813,7 @@ namespace OsEngine.Market.Servers
                             }
                             else if (order.OrderSendType == OrderSendType.Cancel)
                             {
-                                ServerRealization.CanselOrder(order.Order);
+                                ServerRealization.CancelOrder(order.Order);
                             }
                         }
                     }
@@ -1894,7 +1906,7 @@ namespace OsEngine.Market.Servers
         /// отозвать ордер из торговой системы
         /// </summary>
         /// <param name="order"> order / ордер </param>
-        public void CanselOrder(Order order)
+        public void CancelOrder(Order order)
         {
             if (UserSetOrderOnCancel != null)
             {

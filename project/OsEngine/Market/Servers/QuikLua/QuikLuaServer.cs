@@ -387,7 +387,8 @@ namespace OsEngine.Market.Servers.QuikLua
 
                         myPortfolio.Number = accaunts[i].TrdaccId;
 
-                        if (myPortfolio.Number.Remove(6) != "SPBFUT")
+                        if (myPortfolio.Number.Length > 6 && 
+                            myPortfolio.Number.Remove(6) != "SPBFUT")
                         {
                             var qPortfolio = QuikLua.Trading.GetPortfolioInfo(accaunts[i].Firmid, clientCode).Result;
 
@@ -417,7 +418,8 @@ namespace OsEngine.Market.Servers.QuikLua
                         }
                         else
                         {
-                            // TODO make information on futures limits for accounts without EBU / сделать получение информации по фьючерсным лимитам для счетов без ЕБС
+                            // TODO make information on futures limits for accounts without EBU
+                            // сделать получение информации по фьючерсным лимитам для счетов без ЕБС
                         }
 
                         _portfolios.Add(myPortfolio);
@@ -528,7 +530,7 @@ namespace OsEngine.Market.Servers.QuikLua
 
         private List<Order> _ordersAllReadyCanseled = new List<Order>();
 
-        public void CanselOrder(Order order)
+        public void CancelOrder(Order order)
         {
             _ordersAllReadyCanseled.Add(order);
 
