@@ -23,6 +23,7 @@ using OsEngine.Robots.Patterns;
 using OsEngine.Robots.Trend;
 using OsEngine.Robots.OnScriptIndicators;
 using System.Runtime;
+using OsEngine.Robots.MyBot;
 
 namespace OsEngine.Robots
 {
@@ -73,6 +74,7 @@ namespace OsEngine.Robots
             result.Add("RviTrade");
             result.Add("BollingerTrend");
             result.Add("ArbitrageOneLeg");
+            result.Add("PairArbitrage");
 
             List<string> resultTrue = new List<string>();
 
@@ -270,6 +272,10 @@ namespace OsEngine.Robots
             if (nameClass == "ArbitrageOneLeg")
             {
                 bot = new ArbitrageOneLeg(name, startProgram);
+            }
+            if (nameClass == "PairArbitrage")
+            {
+                bot = new PairArbitrage(name, startProgram);
             }
 
 
