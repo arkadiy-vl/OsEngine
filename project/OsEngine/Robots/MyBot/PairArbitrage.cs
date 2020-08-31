@@ -19,6 +19,22 @@ namespace OsEngine.Robots.MyBot
     public class PairArbitrage : BotPanel
     {
         #region Параметры робота
+        // оптимизируемые параметры робота
+        private StrategyParameterInt LenghtMA;                  // длина индикатора скользящая средняя MA
+        private StrategyParameterInt LenghtIvashovMA;           // длина скользящей средней индикатора IvashovRange 
+        private StrategyParameterInt LenghtIvashovAverage;      // длина усреднения индикатора IvashovRange
+        public StrategyParameterDecimal Multiply;              // коэффициент для построения канала индекса
+
+        // настроечные параметры робота
+        public bool IsOn = false;
+        public WhoIsFirst WhoIsFirst = WhoIsFirst.Nobody;       // каким инструментом входим вначале
+        public decimal Volume1 = 1;                             // объем входа для инструмента 1
+        public decimal Volume2 = 1;                             // объем входа для инструмента 2
+        public int Slippage1 = 0;                               // проскальзывание для инструмента 1
+        public int Slippage2 = 0;                               // проскальзывание для инструмента 2
+        public Side Side1 = Side.Buy;                           // сторона входа для инструмента 1, когда индекс выше канала    
+        public Side Side2 = Side.Sell;                          // сторона входа для инструмента 2, когда индекс выше канала
+
         // вкладки для торговли
         BotTabSimple _tab1;
         BotTabSimple _tab2;
@@ -29,17 +45,6 @@ namespace OsEngine.Robots.MyBot
         // индикаторы
         MovingAverage _ma;
         IvashovRange _ivashov;
-
-        // настроечные параметры бота
-        public bool IsOn = false;
-        public WhoIsFirst WhoIsFirst = WhoIsFirst.Nobody;       // каким инструментом входим вначале
-        public decimal Volume1 = 1;                             // объем входа для инструмента 1
-        public decimal Volume2 = 1;                             // объем входа для инструмента 2
-        public int Slippage1 = 0;                               // проскальзывание для инструмента 1
-        public int Slippage2 = 0;                               // проскальзывание для инструмента 2
-        public Side Side1 = Side.Buy;                           // сторона входа для инструмента 1    
-        public Side Side2 = Side.Sell;                          // сторона входа для инструмента 2
-        public decimal Multiply = 1;                                    // коэффициент для построения канала спреда
 
         // последнее значение индекса и индикаторов
         decimal _lastIndexPrice;
@@ -70,6 +75,27 @@ namespace OsEngine.Robots.MyBot
             _tab2 = TabsSimple[1];
             _tabIndex = TabsIndex[0];
 
+            // создаем оптимизируемые параметры
+            LenghtMA = CreateParameter("LenghtMA", 60, 60, 200, 20); 
+            LenghtIvashovMA = CreateParameter("LenghtIvashovMA", 100, 60, 200, 20); 
+            LenghtIvashovAverage = CreateParameter("LenghtIvashovAverage", 100, 60, 200, 20); 
+            Multiply = CreateParameter("Multiply", 1.0m, 0.6m, 2, 0.2m); 
+            
+            // создаем индикаторы
+            _ma = new MovingAverage(name + "ma", false);
+            _ma = (MovingAverage)_tabIndex.CreateCandleIndicator(_ma, "Prime");
+            _ma.Lenght = LenghtMA.ValueInt;
+            _ma.Save();
+
+            _ivashov = new IvashovRange(name + "ivashov", false);
+            _ivashov = (IvashovRange)_tabIndex.CreateCandleIndicator(_ivashov, "Second");
+            _ivashov.LenghtAverage = LenghtIvashovAverage.ValueInt;
+            _ivashov.LenghtMa = LenghtIvashovMA.ValueInt;
+            _ivashov.Save();
+
+            // загружаем настроечные параметры бота
+            Load();
+
             // подписка на событие обновление индекса
             _tabIndex.SpreadChangeEvent += _tabIndex_SpreadChangeEvent;
 
@@ -78,25 +104,30 @@ namespace OsEngine.Robots.MyBot
             _tab2.PositionOpeningSuccesEvent += _tab2_PositionOpeningSuccesEvent;
 
             // подписка на сервисные события
+            ParametrsChangeByUser += PairArbitrage_ParametrsChangeByUser;
             DeleteEvent += Strategy_DeleteEvent;
-
-            // создаем индикаторы
-            _ma = new MovingAverage(name + "ma", false);
-            _ma = (MovingAverage)_tabIndex.CreateCandleIndicator(_ma, "Prime");
-            _ma.Lenght = 50;
-            _ma.Save();
-
-            _ivashov = new IvashovRange(name + "ivashov", false);
-            _ivashov = (IvashovRange)_tabIndex.CreateCandleIndicator(_ivashov, "Second");
-            _ivashov.LenghtAverage = 100;
-            _ivashov.LenghtMa = 100;
-            _ivashov.Save();
-
-            // загружаем настроечные параметры бота
-            Load();
         }
 
         #region Сервисные методы
+        /// <summary>
+        /// Сервисный метод, вызываемый при изменении оптимизируемых параметров робота
+        /// </summary>
+        private void PairArbitrage_ParametrsChangeByUser()
+        {
+            if (_ma.Lenght != LenghtMA.ValueInt)
+            {
+                _ma.Lenght = LenghtMA.ValueInt;
+                _ma.Reload();
+            }
+
+            if (_ivashov.LenghtMa != LenghtIvashovMA.ValueInt ||
+                _ivashov.LenghtAverage != LenghtIvashovAverage.ValueInt)
+            {
+                _ivashov.LenghtMa = LenghtIvashovMA.ValueInt;
+                _ivashov.LenghtAverage = LenghtIvashovAverage.ValueInt;
+                _ivashov.Reload();
+            }
+        }
 
         /// <summary>
         /// Сервисный метод получения имени стратегии робота
@@ -134,7 +165,6 @@ namespace OsEngine.Robots.MyBot
                     writer.WriteLine(Slippage2);
                     writer.WriteLine(Side1);
                     writer.WriteLine(Side2);
-                    writer.WriteLine(Multiply);
 
                     writer.Close();
                 }
@@ -168,7 +198,6 @@ namespace OsEngine.Robots.MyBot
                     Slippage2 = Convert.ToInt32(reader.ReadLine());
                     Enum.TryParse(reader.ReadLine(), out Side1);
                     Enum.TryParse(reader.ReadLine(), out Side2);
-                    Multiply = Convert.ToDecimal(reader.ReadLine());
 
                     reader.Close();
                 }
@@ -256,7 +285,7 @@ namespace OsEngine.Robots.MyBot
         private void LogicToOpen(List<Candle> candles)
         {
             // open high
-            if (_lastIndexPrice > _lastMA + _lastIvashov * Multiply)
+            if (_lastIndexPrice > _lastMA + _lastIvashov * Multiply.ValueDecimal)
             {
                 // проверяем, может ли инструмент 1 открываться первым
                 if (WhoIsFirst == WhoIsFirst.First || WhoIsFirst == WhoIsFirst.Nobody)
@@ -287,7 +316,7 @@ namespace OsEngine.Robots.MyBot
                 }
             }
             // open low
-            else if (_lastIndexPrice < _lastMA - _lastIvashov * Multiply)
+            else if (_lastIndexPrice < _lastMA - _lastIvashov * Multiply.ValueDecimal)
             {
                 // проверяем, может ли инструмент 1 открываться первым
                 if (WhoIsFirst == WhoIsFirst.First || WhoIsFirst == WhoIsFirst.Nobody)
@@ -335,7 +364,7 @@ namespace OsEngine.Robots.MyBot
             }
 
             // закрытие позиций, которые открылись, когда индекс был ниже канала 
-            if (_lastIndexPrice > _lastMA + _lastIvashov * Multiply)
+            if (_lastIndexPrice > _lastMA + _lastIvashov * Multiply.ValueDecimal)
             {
                 if (positions1.Count != 0 &&
                     positions1[0].Direction != Side1)
@@ -372,7 +401,7 @@ namespace OsEngine.Robots.MyBot
 
             }
             // закрытие позиций, которые открылись, когда индекс был выше канала
-            else if (_lastIndexPrice < _lastMA - _lastIvashov * Multiply)
+            else if (_lastIndexPrice < _lastMA - _lastIvashov * Multiply.ValueDecimal)
             {
                 if (positions1.Count != 0 &&
                     positions1[0].Direction == Side1)

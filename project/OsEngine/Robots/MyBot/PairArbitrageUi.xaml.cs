@@ -33,7 +33,7 @@ namespace OsEngine.Robots.MyBot
             cmbWhoIsFirst.Items.Add(WhoIsFirst.Second.ToString());
             cmbWhoIsFirst.Items.Add(WhoIsFirst.Nobody.ToString());
             cmbWhoIsFirst.SelectedItem = _bot.WhoIsFirst.ToString();
-            txbMultiply.Text = _bot.Multiply.ToString();
+            txbMultiply.Text = _bot.Multiply.ValueDecimal.ToString();
 
             cmbSide1.Items.Add(Side.Buy.ToString());
             cmbSide1.Items.Add(Side.Sell.ToString());
@@ -59,7 +59,7 @@ namespace OsEngine.Robots.MyBot
             Enum.TryParse(cmbSide2.SelectedItem.ToString(), out _bot.Side2);
             try
             {
-                _bot.Multiply = Convert.ToDecimal(txbMultiply.Text);
+                _bot.Multiply.ValueDecimal = Convert.ToDecimal(txbMultiply.Text);
                 _bot.Volume1 = Convert.ToDecimal(txbVolume1.Text);
                 _bot.Volume2 = Convert.ToDecimal(txbVolume2.Text);
                 _bot.Slippage1 = Convert.ToInt32(txbSlippage1.Text);
