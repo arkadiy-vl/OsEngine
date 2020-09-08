@@ -23,7 +23,7 @@ namespace OsEngine.Robots.MyBot
         private StrategyParameterInt LenghtMA;                  // длина индикатора скользящая средняя MA
         private StrategyParameterInt LenghtIvashovMA;           // длина скользящей средней индикатора IvashovRange 
         private StrategyParameterInt LenghtIvashovAverage;      // длина усреднения индикатора IvashovRange
-        public StrategyParameterDecimal Multiply;              // коэффициент для построения канала индекса
+        public StrategyParameterDecimal Multiply;               // коэффициент для построения канала индекса
 
         // настроечные параметры робота
         public bool IsOn = false;

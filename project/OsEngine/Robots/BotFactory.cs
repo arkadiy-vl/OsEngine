@@ -75,6 +75,7 @@ namespace OsEngine.Robots
             result.Add("BollingerTrend");
             result.Add("ArbitrageOneLeg");
             result.Add("PairArbitrage");
+            result.Add("OneLegArbitrageGrid");
 
             List<string> resultTrue = new List<string>();
 
@@ -278,6 +279,10 @@ namespace OsEngine.Robots
                 bot = new PairArbitrage(name, startProgram);
             }
 
+            if (nameClass == "OneLegArbitrageGrid")
+            {
+                bot = new OneLegArbitrageGrid(name, startProgram);
+            }
 
             return bot;
         }
