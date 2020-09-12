@@ -7,16 +7,19 @@
         mc:Ignorable="d"
         Title="Settings" Style="{StaticResource WindowStyleNoResize}" ResizeMode ="NoResize" Height="343.5" Width="422.5">
     <Grid>
-        <CheckBox Name="chbIsOn" Content="IsOn" HorizontalAlignment="Left" Margin="203,28,0,0" VerticalAlignment="Top" Foreground="#FFFF7212"/>
-        <TextBox Name="txbVolume" HorizontalAlignment="Left" Margin="203,67,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
-        <Label Content="Volume" HorizontalAlignment="Left" Margin="121,67,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="txbMaxPositionsCount" HorizontalAlignment="Left" Margin="203,107,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
-        <Label Content="MaxPositionsCount" HorizontalAlignment="Left" Margin="54,107,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="txbPositionsSpread" HorizontalAlignment="Left" Margin="203,148,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
-        <Label Content="PositionsSpread" HorizontalAlignment="Left" Margin="73,148,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="txbMaxOrderDistance" HorizontalAlignment="Left" Margin="203,190,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
-        <Label Content="MaxOrderDistance" HorizontalAlignment="Left" Margin="57,190,0,0" VerticalAlignment="Top"/>
-        <Button Name="btnAccept" Content="Accept" HorizontalAlignment="Left" Margin="203,243,0,0" VerticalAlignment="Top" Width="120" RenderTransformOrigin="0.747,0.6" Click="BtnAccept_Click"/>
+        <CheckBox Name="chbIsOn" Content="IsOn" HorizontalAlignment="Left" Margin="203,16,0,0" VerticalAlignment="Top" Foreground="#FFFF7212"/>
+        <TextBox Name="txbVolume" HorizontalAlignment="Left" Margin="203,55,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Volume" HorizontalAlignment="Left" Margin="121,55,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="txbMaxPositionsCount" HorizontalAlignment="Left" Margin="203,95,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="MaxPositionsCount" HorizontalAlignment="Left" Margin="54,95,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="txbPositionsSpread" HorizontalAlignment="Left" Margin="203,136,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="PositionsSpread" HorizontalAlignment="Left" Margin="73,136,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="txbMaxOrderDistance" HorizontalAlignment="Left" Margin="203,178,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="MaxOrderDistance" HorizontalAlignment="Left" Margin="57,178,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="txbTradeTimePeriod" HorizontalAlignment="Left" Margin="203,220,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="TradeTimePeriod" HorizontalAlignment="Left" Margin="68,220,0,0" VerticalAlignment="Top"/>
+        <Button Name="btnAccept" Content="Accept" HorizontalAlignment="Left" Margin="203,255,0,0" VerticalAlignment="Top" Width="120" RenderTransformOrigin="0.747,0.6" Click="BtnAccept_Click"/>
+        
 
     </Grid>
 </Window>

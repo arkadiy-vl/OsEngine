@@ -31,6 +31,7 @@ namespace OsEngine.Robots.MyBot
             txbMaxPositionsCount.Text = _bot.MaxPositionsCount.ToString();
             txbPositionsSpread.Text = _bot.PositionsSpread.ToString();
             txbMaxOrderDistance.Text = _bot.MaxOrderDistance.ToString();
+            txbTradeTimePeriod.Text = _bot.TradeTimePeriod.ToString();
         }
 
         private void BtnAccept_Click(object sender, RoutedEventArgs e)
@@ -42,6 +43,7 @@ namespace OsEngine.Robots.MyBot
                 _bot.MaxPositionsCount = Convert.ToInt32(txbMaxPositionsCount.Text);
                 _bot.PositionsSpread = Convert.ToInt32(txbPositionsSpread.Text);
                 _bot.MaxOrderDistance = Convert.ToInt32(txbMaxOrderDistance.Text);
+                _bot.TradeTimePeriod = Convert.ToInt32(txbTradeTimePeriod.Text);
             }
             catch (Exception)
             {

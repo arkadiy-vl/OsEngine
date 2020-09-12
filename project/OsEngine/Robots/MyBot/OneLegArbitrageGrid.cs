@@ -17,6 +17,7 @@ namespace OsEngine.Robots.MyBot
 
     /// <summary>
     /// Робот для одноного арбитража относительно индекса из курса OsEngine - Арбитраж
+    /// В данном роботе надо отключать сопровождение позиции
     /// </summary>
     public class OneLegArbitrageGrid : BotPanel
     {
@@ -30,20 +31,16 @@ namespace OsEngine.Robots.MyBot
         // настроечные параметры робота
         public bool IsOn = false;                               // включение/выключение робота
         public decimal Volume = 1;                              // объем входа
-        public int MaxPositionsCount = 10;                           // максимальное количество позиций, которое может открыть робот
-        public int PositionsSpread = 1;                             // спред между открываемыми позициями
-        public int MaxOrderDistance = 15;                            // максимальное расстояние от края стакана
-
-        // временной период торговли робота в секундах 
-        int _tradeTimePeriod = 10;
+        public int MaxPositionsCount = 10;                      // максимальное количество позиций, которое может открыть робот
+        public int PositionsSpread = 10;                         // спред между открываемыми позициями
+        public int MaxOrderDistance = 110;                      // максимальное расстояние от края стакана
+        public int TradeTimePeriod = 10;                        // временной период торговли робота в секундах
 
         // последнее значение времени торговли робота
-        DateTime _lastTradeTime = DateTime.Now;
+        DateTime _lastTradeTime = DateTime.Now.AddYears(-10);
 
-        // вкладка для торговли
+        // вкладка для торговли и индекса
         BotTabSimple _tab;
-
-        // вкладка для индекса
         BotTabIndex _tabIndex;
 
         // индикаторы
@@ -54,8 +51,6 @@ namespace OsEngine.Robots.MyBot
         decimal _lastIndexPrice;
         decimal _lastMA;
         decimal _lastIvashov;
-
-
 
         // имя программы, которая запустила бота
         private StartProgram _startProgram;
@@ -108,10 +103,6 @@ namespace OsEngine.Robots.MyBot
             DeleteEvent += OneLegArbitrage_DeleteEvent;
         }
 
-        
-
-
-
         #region Сервисные методы
         /// <summary>
         /// Сервисный метод получения имени стратегии робота
@@ -146,6 +137,7 @@ namespace OsEngine.Robots.MyBot
                     writer.WriteLine(MaxPositionsCount);
                     writer.WriteLine(PositionsSpread);
                     writer.WriteLine(MaxOrderDistance);
+                    writer.WriteLine(TradeTimePeriod);
 
                     writer.Close();
                 }
@@ -175,6 +167,7 @@ namespace OsEngine.Robots.MyBot
                     MaxPositionsCount = Convert.ToInt32(reader.ReadLine());
                     PositionsSpread = Convert.ToInt32(reader.ReadLine());
                     MaxOrderDistance = Convert.ToInt32(reader.ReadLine());
+                    TradeTimePeriod = Convert.ToInt32(reader.ReadLine());
 
                     reader.Close();
                 }
@@ -185,11 +178,29 @@ namespace OsEngine.Robots.MyBot
             }
         }
 
+        /// <summary>
+        /// Обработчик события изменения пользователем настроечных параметров робота 
+        /// </summary>
         private void OneLegArbitrage_ParametrsChangeByUser()
         {
-            
+            if (_ma.Lenght != LenghtMA.ValueInt)
+            {
+                _ma.Lenght = LenghtMA.ValueInt;
+                _ma.Reload();
+            }
+
+            if (_ivashov.LenghtAverage != LenghtIvashovAverage.ValueInt ||
+                _ivashov.LenghtMa != LenghtIvashovMA.ValueInt)
+            {
+                _ivashov.LenghtAverage = LenghtIvashovAverage.ValueInt;
+                _ivashov.LenghtMa = LenghtIvashovMA.ValueInt;
+                _ivashov.Reload();
+            }
         }
 
+        /// <summary>
+        /// Обработчик события удаления пользователем робота
+        /// </summary>
         private void OneLegArbitrage_DeleteEvent()
         {
             if(File.Exists(@"Engine\" + NameStrategyUniq + @"SettingsBot.txt"))
@@ -229,7 +240,7 @@ namespace OsEngine.Robots.MyBot
             }
 
             // запускаем торговую логику только через периоды времени _tradeTimePeriod 
-            if (_lastTradeTime.AddSeconds(_tradeTimePeriod) > time)
+            if (_lastTradeTime.AddSeconds(TradeTimePeriod) > time)
             {
                 return;
             }
@@ -267,38 +278,129 @@ namespace OsEngine.Robots.MyBot
             List<Position> positions = _tab.PositionsOpenAll;
 
             int curPosCount = positions.Count;
-            decimal curPricePosition = _tab.PriceBestBid;
+            decimal curPricePosition = _tab.PriceBestAsk;
 
             for(int i = 0; i < MaxPositionsCount - curPosCount; i++)
             {
-
+                if(positions.Find(pos=>pos.EntryPrice == curPricePosition) != null)
+                {
+                    curPricePosition += PositionsSpread * _tab.Securiti.PriceStep;
+                    i--;
+                    continue;
+                }
+                _tab.SellAtLimit(Volume, curPricePosition);
+                curPricePosition += PositionsSpread * _tab.Securiti.PriceStep;
             }
-
         }
 
         private void TryOpenLongPositions()
         {
+            List<Position> positions = _tab.PositionsOpenAll;
 
+            int curPosCount = positions.Count;
+            decimal curPricePosition = _tab.PriceBestBid;
+
+            for (int i = 0; i < MaxPositionsCount - curPosCount; i++)
+            {
+                if (positions.Find(pos => pos.EntryPrice == curPricePosition) != null)
+                {
+                    curPricePosition -= PositionsSpread * _tab.Securiti.PriceStep;
+                    i--;
+                    continue;
+                }
+                _tab.BuyAtLimit(Volume, curPricePosition);
+                curPricePosition -= PositionsSpread * _tab.Securiti.PriceStep;
+            }
         }
 
         private void TryCloseShortPositions()
-        {               
-                        
+        {
+            // получаем все позиции шорт
+            List<Position> positions = _tab.PositionOpenShort;
+
+            for (int i = 0; i < positions.Count; i++)
+            {
+                // проверяем, что позиция уже не закрывается
+                if(positions[i].CloseActiv)
+                {
+                    continue;
+                }
+                // выставляем лимитную заявку на закрытие позиции шорт (покупаем)
+                _tab.CloseAtLimit(positions[i], _tab.PriceBestAsk, positions[i].OpenVolume);
+            }
         }               
                         
         private void TryCloseLongPositions()
         {
+            // получаем все позиции лонг
+            List<Position> positions = _tab.PositionOpenLong;
 
+            for (int i = 0; i < positions.Count; i++)
+            {
+                // проверяем, что позиция уже не закрывается
+                if (positions[i].CloseActiv)
+                {
+                    continue;
+                }
+                // выставляем лимитную заявку на закрытие позиции лонг (продаем)
+                _tab.CloseAtLimit(positions[i], _tab.PriceBestBid, positions[i].OpenVolume);
+            }
         }
 
         private void CheckClosingPositions()
         {
-
+            // не реализовано
         }
 
         private void CheckDistanceToOrder()
         {
+            // минимально допустимая цена для открытия лонг позиции
+            decimal downLongPrice = _tab.PriceBestBid - MaxOrderDistance * _tab.Securiti.PriceStep;
 
+            // максимально допустимая цена для открытия шорт позиции
+            decimal upShortPrice = _tab.PriceBestAsk + MaxOrderDistance * _tab.Securiti.PriceStep;
+            
+            // получаем все открытые позиции
+            List<Position> positions = _tab.PositionsOpenAll;
+            for (int i = 0; i < positions.Count; i++)
+            {
+                // если у позиции есть ордер на открытие и исполненный объем ордера равен нулю
+                // и цена ордера вышла за предельную цену, то отзываем ордер
+                if (positions[i].OpenActiv &&
+                    positions[i].OpenOrders[positions[i].OpenOrders.Count-1].VolumeExecute == 0)
+                {
+                    if(positions[i].Direction == Side.Buy &&
+                        positions[i].OpenOrders[positions[i].OpenOrders.Count-1].Price < downLongPrice)
+                    {
+                        _tab.CloseAllOrderToPosition(positions[i]);
+                        continue;
+                    }
+                    else if (positions[i].Direction == Side.Sell &&
+                       positions[i].OpenOrders[positions[i].OpenOrders.Count - 1].Price > upShortPrice)
+                    {
+                        _tab.CloseAllOrderToPosition(positions[i]);
+                        continue;
+                    }
+                }
+                // если у позициии есть ордер на закрытие и исполненный объем ордера равен нулю
+                // и цена ордера вышла за предельную цену, то отзываем ордер 
+                if (positions[i].CloseActiv &&
+                    positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].VolumeExecute == 0)
+                {
+                    if (positions[i].Direction == Side.Buy &&
+                       positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].Price > upShortPrice)
+                    {
+                        _tab.CloseAllOrderToPosition(positions[i]);
+                        continue;
+                    }
+                    else if (positions[i].Direction == Side.Sell &&
+                       positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].Price < downLongPrice)
+                    {
+                        _tab.CloseAllOrderToPosition(positions[i]);
+                        continue;
+                    }
+                }
+            }
         }
 
         /// <summary>
