@@ -76,6 +76,7 @@ namespace OsEngine.Robots
             result.Add("ArbitrageOneLeg");
             result.Add("PairArbitrage");
             result.Add("OneLegArbitrageGrid");
+            result.Add("HftEngine");
 
             List<string> resultTrue = new List<string>();
 
@@ -282,6 +283,10 @@ namespace OsEngine.Robots
             if (nameClass == "OneLegArbitrageGrid")
             {
                 bot = new OneLegArbitrageGrid(name, startProgram);
+            }
+            if (nameClass == "HftEngine")
+            {
+                bot = new HftEngine(name, startProgram);
             }
 
             return bot;
