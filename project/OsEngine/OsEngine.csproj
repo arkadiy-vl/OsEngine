@@ -729,6 +729,10 @@
     <Compile Include="Robots\MarketMaker\PairTraderSimpleUi.xaml.cs">
       <DependentUpon>PairTraderSimpleUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Robots\MyBot\HftEngine.cs" />
+    <Compile Include="Robots\MyBot\HftEngineUi.xaml.cs">
+      <DependentUpon>HftEngineUi.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Robots\MyBot\OneLegArbitrageGrid.cs" />
     <Compile Include="Robots\MyBot\OneLegArbitrageGridUi.xaml.cs">
       <DependentUpon>OneLegArbitrageGridUi.xaml</DependentUpon>
@@ -1223,6 +1227,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Robots\MarketMaker\PairTraderSimpleUi.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Robots\MyBot\HftEngineUi.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
