@@ -13,7 +13,6 @@ using System.Reflection;
 using System.Threading;
 using Microsoft.CSharp;
 using OsEngine.Entity;
-using OsEngine.Market;
 using OsEngine.OsTrader.Panels;
 using OsEngine.Robots.CounterTrend;
 using OsEngine.Robots.Engines;
@@ -360,6 +359,15 @@ namespace OsEngine.Robots
                 }
             }
 
+            for (int i = 0; i < results.Count; i++)
+            {
+                if (results.Contains("Dlls"))
+                {
+                    results.RemoveAt(i);
+                    i--;
+                }
+            }
+
             return results;
         }
 
@@ -398,10 +406,115 @@ namespace OsEngine.Robots
             return bot;
         }
 
+        private static bool _isFirstTime = true;
+
+        private static string[] linksToDll;
+
         private static BotPanel Serialize(string path, string nameClass, string name, StartProgram startProgram)
         {
             try
             {
+                if (linksToDll == null)
+                {
+                    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+                    string[] res = Array.ConvertAll<Assembly, string>(assemblies, (x) =>
+                    {
+                        if (!x.IsDynamic)
+                        {
+                            return x.Location;
+                        }
+
+                        return null;
+                    });
+
+                    for (int i = 0; i < res.Length; i++)
+                    {
+                        if (string.IsNullOrEmpty(res[i]))
+                        {
+                            List<string> list = res.ToList();
+                            list.RemoveAt(i);
+                            res = list.ToArray();
+                            i--;
+                        }
+                        else if (res[i].Contains("System.Runtime.Serialization")
+                                 || i > 24)
+                        {
+                            List<string> list = res.ToList();
+                            list.RemoveAt(i);
+                            res = list.ToArray();
+                            i--;
+                        }
+                    }
+
+                    string dllPath = AppDomain.CurrentDomain.BaseDirectory + "System.Runtime.Serialization.dll";
+
+                    List<string> listRes = res.ToList();
+                    listRes.Add(dllPath);
+                    res = listRes.ToArray();
+                    linksToDll = res;
+                }
+
+                List<string> dllsToCompiler = linksToDll.ToList();
+
+                List<string> dllsFromPath = GetDllsPathFromFolder(path);
+
+                if (dllsFromPath != null && dllsFromPath.Count != 0)
+                {
+                    for (int i = 0; i < dllsFromPath.Count; i++)
+                    {
+                        string dll = dllsFromPath[i].Split('\\')[dllsFromPath[i].Split('\\').Length - 1];
+
+                        if (dllsToCompiler.Find(d => d.Contains(dll)) == null)
+                        {
+                            dllsToCompiler.Add(dllsFromPath[i]);
+                        }
+                    }
+                }
+
+                CompilerParameters cp = new CompilerParameters(dllsToCompiler.ToArray());
+
+                // Помечаем сборку, как временную
+                cp.GenerateInMemory = true;
+                cp.IncludeDebugInformation = true;
+                cp.TempFiles.KeepFiles = false;
+
+
+                string folderCur = AppDomain.CurrentDomain.BaseDirectory + "Engine\\Temp";
+
+                if (Directory.Exists(folderCur) == false)
+                {
+                    Directory.CreateDirectory(folderCur);
+                }
+
+                folderCur += "\\Bots";
+
+                if (Directory.Exists(folderCur) == false)
+                {
+                    Directory.CreateDirectory(folderCur);
+                }
+
+                if (_isFirstTime)
+                {
+                    _isFirstTime = false;
+
+                    string[] files = Directory.GetFiles(folderCur);
+
+                    for (int i = 0; i < files.Length; i++)
+                    {
+                        try
+                        {
+                            File.Delete(files[i]);
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                    }
+                }
+
+                cp.TempFiles = new TempFileCollection(folderCur, false);
+
                 BotPanel result = null;
 
                 string fileStr = ReadFile(path);
@@ -409,32 +522,13 @@ namespace OsEngine.Robots
                 //Объявляем провайдер кода С#
                 CSharpCodeProvider prov = new CSharpCodeProvider();
 
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-
-                var res = Array.ConvertAll<Assembly, string>(assemblies, (x) =>
-                {
-                    if (!x.IsDynamic)
-                    {
-                        return x.Location;
-                    }
-
-                    return null;
-                });
-
-                CompilerParameters cp = new CompilerParameters(res);
-
-                // Помечаем сборку, как временную
-                cp.GenerateInMemory = true;
-                cp.IncludeDebugInformation = true;
-              
-               
                 // Обрабатываем CSC компилятором
                 CompilerResults results = prov.CompileAssemblyFromSource(cp, fileStr);
 
                 if (results.Errors != null && results.Errors.Count != 0)
                 {
                     string errorString = "Error! Robot script runTime compilation problem! \n";
-                    errorString += "Path to indicator: " + path + " \n";
+                    errorString += "Path to Robot: " + path + " \n";
 
                     int errorNum = 1;
 
@@ -454,13 +548,13 @@ namespace OsEngine.Robots
                 param.Add(startProgram);
 
                 result = (BotPanel)results.CompiledAssembly.CreateInstance(
-                    results.CompiledAssembly.DefinedTypes.ElementAt(0).FullName, false, BindingFlags.Default, null,
+                    results.CompiledAssembly.DefinedTypes.ElementAt(0).FullName, false, BindingFlags.CreateInstance, null,
                     param.ToArray(), CultureInfo.CurrentCulture, null);
 
                 if (result == null)
                 {
                     string errorString = "Error! Robot script runTime compilation problem! \n";
-                    errorString += "Path to indicator: " + path + " \n";
+                    errorString += "Path to robot: " + path + " \n";
 
                     int errorNum = 1;
 
@@ -483,6 +577,34 @@ namespace OsEngine.Robots
             }
         }
 
+        private static List<string> GetDllsPathFromFolder(string path)
+        {
+            string folderPath = path.Remove(path.LastIndexOf('\\'), path.Length - path.LastIndexOf('\\'));
+
+            if (Directory.Exists(folderPath + "\\Dlls") == false)
+            {
+                return null;
+            }
+
+            string[] filesInFolder = Directory.GetFiles(folderPath + "\\Dlls");
+
+            List<string> dlls = new List<string>();
+
+            for (int i = 0; i < filesInFolder.Length; i++)
+            {
+                if (filesInFolder[i].EndsWith(".dll") == false)
+                {
+                    continue;
+                }
+
+                string dllPath = AppDomain.CurrentDomain.BaseDirectory + filesInFolder[i];
+
+                dlls.Add(dllPath);
+            }
+
+            return dlls;
+        }
+
         private static string ReadFile(string path)
         {
             String result = "";
@@ -496,7 +618,7 @@ namespace OsEngine.Robots
             return result;
         }
 
-// Names Include Bots With Params
+        // Names Include Bots With Params
 
         public static List<string> GetNamesStrategyWithParametersSync()
         {

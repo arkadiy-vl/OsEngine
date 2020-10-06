@@ -197,6 +197,34 @@ namespace OsEngine.Market.Connectors
             }
         }
 
+        private bool _lastHardReconnectOver = true;
+
+        /// <summary>
+        /// принудительное переподключение
+        /// </summary>
+        public void ReconnectHard()
+        {
+            if (_lastHardReconnectOver == false)
+            {
+                return;
+            }
+
+            _lastHardReconnectOver = false;
+
+            DateTime timestart = DateTime.Now;
+
+            if (_mySeries != null)
+            {
+                _mySeries.Stop();
+                _mySeries.Clear();
+                _mySeries = null;
+            }
+
+            Reconnect();
+
+            _lastHardReconnectOver = true;
+        }
+
         /// <summary>
         /// name of bot that owns the connector
         /// имя робота которому принадлежит коннектор
@@ -1074,6 +1102,7 @@ namespace OsEngine.Market.Connectors
             {
                 // it's hard to catch the error here. Who will understand what is wrong - well done 
                 // ошибка сдесь трудноуловимая. Кто поймёт что не так - молодец
+                return;
             }
 
             try

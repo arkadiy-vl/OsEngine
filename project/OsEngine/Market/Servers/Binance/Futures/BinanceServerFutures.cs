@@ -153,7 +153,7 @@ namespace OsEngine.Market.Servers.Binance.Futures
         /// cancel order
         /// отозвать ордер
         /// </summary>
-        public void CanсelOrder(Order order)
+        public void CancelOrder(Order order)
         {
             _client.CanсelOrder(order);
         }
@@ -323,7 +323,13 @@ namespace OsEngine.Market.Servers.Binance.Futures
                     return;
                 }
                 Trade trade = new Trade();
-                trade.SecurityNameCode = trades.data.s;
+                trade.SecurityNameCode = trades.stream.ToString().ToUpper().Split('@')[0];
+
+                if (trade.SecurityNameCode != trades.data.s)
+                {
+                    return;
+                }
+
                 trade.Price =
                         trades.data.p.ToDecimal();
                 trade.Id = trades.data.t.ToString();
@@ -684,11 +690,6 @@ namespace OsEngine.Market.Servers.Binance.Futures
             {
                 LogMessageEvent(message, type);
             }
-        }
-
-        public void CancelOrder(Order order)
-        {
-            
         }
 
         /// <summary>

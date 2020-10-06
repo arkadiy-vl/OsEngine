@@ -3,9 +3,11 @@ using OsEngine.Logging;
 using OsEngine.Market.Servers.Entity;
 using OsEngine.Market.Servers.Transaq.TransaqEntity;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -36,6 +38,13 @@ namespace OsEngine.Market.Servers.Transaq
             CreateParameterPassword(OsLocalization.Market.Message64, "");
             CreateParameterString(OsLocalization.Market.Label41, "tr1.finam.ru");
             CreateParameterString(OsLocalization.Market.Message90, "3900");
+            CreateParameterBoolean(OsLocalization.Market.UseStock, true);
+            CreateParameterBoolean(OsLocalization.Market.UseFutures, true);
+            CreateParameterBoolean(OsLocalization.Market.UseCurrency, true);
+            CreateParameterBoolean(OsLocalization.Market.UseOptions, false);
+            CreateParameterBoolean(OsLocalization.Market.UseOther, false);
+            CreateParameterBoolean(OsLocalization.Market.UseSecInfoUpdates, false);
+
         }
 
         public ServerWorkingTimeSettings WorkingTimeSettings;
@@ -62,6 +71,13 @@ namespace OsEngine.Market.Servers.Transaq
     public class TransaqServerRealization : IServerRealization
     {
         private readonly string _logPath;
+
+        private bool _useStock = false;
+        private bool _useFutures = false;
+        private bool _useOptions = false;
+        private bool _useCurrency = false;
+        private bool _useOther = false;
+
 
         public TransaqServerRealization(ServerWorkingTimeSettings workingTimeSettings)
         {
@@ -169,6 +185,13 @@ namespace OsEngine.Market.Servers.Transaq
                 ((ServerParameterString)ServerParameters[3]).Value,
                 _logPath);
 
+            _useStock = ((ServerParameterBool)ServerParameters[4]).Value;
+            _useFutures = ((ServerParameterBool)ServerParameters[5]).Value;
+            _useCurrency = ((ServerParameterBool)ServerParameters[6]).Value;
+            _useOptions = ((ServerParameterBool)ServerParameters[7]).Value;
+            _useOther = ((ServerParameterBool)ServerParameters[8]).Value;
+            var useSecUpdates = ((ServerParameterBool)ServerParameters[9]).Value;
+
             _client.Connected += _client_Connected;
             _client.Disconnected += _client_Disconnected;
             _client.LogMessageEvent += SendLogMessage;
@@ -185,7 +208,7 @@ namespace OsEngine.Market.Servers.Transaq
             _client.NeedChangePassword += NeedChangePassword;
             _client.UpdateSecurity += ClientOnUpdateSecurityInfo;
 
-            _client.Connect();
+            _client.Connect(useSecUpdates);
 
             _cancellationTokenSource = new CancellationTokenSource();
 
@@ -284,22 +307,31 @@ namespace OsEngine.Market.Servers.Transaq
                 _client.NeedChangePassword -= NeedChangePassword;
                 _client.UpdateSecurity -= ClientOnUpdateSecurityInfo;
             }
+
             _depths?.Clear();
+
             _depths = null;
 
             _allCandleSeries?.Clear();
 
             _cancellationTokenSource?.Cancel();
 
+            _transaqSecurities = new ConcurrentBag<string>();
+
+            _portfoliosHandlerTask = null;
+
             _securities = new List<Security>();
 
+            _securityInfos = new List<string>();
+
             _client = null;
+
             ServerStatus = ServerConnectStatus.Disconnect;
         }
 
         public void GetOrdersState(List<Order> orders)
         {
-            throw new NotSupportedException("The operation of receiving the status of orders is not supported in the current connector" );
+            throw new NotSupportedException("The operation of receiving the status of orders is not supported in the current connector");
         }
 
         private List<Portfolio> _portfolios;
@@ -348,22 +380,22 @@ namespace OsEngine.Market.Servers.Transaq
                     continue;
                 }
 
-                if (_clients[0].Union != null)
+               foreach (var client in _clients)
                 {
-                    command = $"<command id=\"get_united_portfolio\" union=\"{_clients[0].Union}\"/>";
-
-                    string res = _client.ConnectorSendCommand(command);
-
-                    if (res != "<result success=\"true\"/>")
+                    if (client.Union != null)
                     {
-                        SendLogMessage(res, LogMessageType.Error);
-                    }
+                        command = $"<command id=\"get_united_portfolio\" union=\"{client.Union}\"/>";
 
-                    Thread.Sleep(10000);
-                }
-                else
-                {
-                    foreach (var client in _clients)
+                        string res = _client.ConnectorSendCommand(command);
+
+                        if (res != "<result success=\"true\"/>")
+                        {
+                            SendLogMessage(res, LogMessageType.Error);
+                        }
+
+                        Thread.Sleep(10000);
+                    }
+                    else
                     {
                         command = $"<command id=\"get_client_limits\" client=\"{client.Id}\"/>";
                         string res = _client.ConnectorSendCommand(command);
@@ -417,13 +449,13 @@ namespace OsEngine.Market.Servers.Transaq
             cmd += "<seccode>" + needSec.Name + "</seccode>";
             cmd += "</security>";
             cmd += _isMono ? "<client>" + order.PortfolioNumber + "</client>" : "<union>" + order.PortfolioNumber + "</union>";
-            cmd += "<price>" + order.Price.ToString().Replace(',','.') + "</price>";
+            cmd += "<price>" + order.Price.ToString().Replace(',', '.') + "</price>";
             cmd += "<quantity>" + order.Volume + "</quantity>";
             cmd += "<buysell>" + side + "</buysell>";
             cmd += "<brokerref>" + order.NumberUser + "</brokerref>";
             cmd += "<unfilled> PutInQueue </unfilled>";
 
-            if(needSec.NameClass == "TQBR")
+            if (needSec.NameClass == "TQBR")
             {
                 if (side == "S")
                 {
@@ -804,6 +836,8 @@ namespace OsEngine.Market.Servers.Transaq
 
         void _client_Connected()
         {
+            CreateSecurities();
+            UpdateSecuritiesParallel();
             ConnectEvent?.Invoke();
             ServerStatus = ServerConnectStatus.Connect;
         }
@@ -1012,64 +1046,98 @@ namespace OsEngine.Market.Servers.Transaq
         /// пришли инструменты
         /// </summary>
         /// <param name="securities">list of instrument in transaq format / список инструментов в формате transaq</param>
-        private void ClientOnUpdatePairs(List<TransaqEntity.Security> securities)
+        private void ClientOnUpdatePairs(string securities)
         {
             HandleSecurities(securities);
         }
+
+        private List<string> _securityInfos = new List<string>();
 
         /// <summary>
         /// obtained additional data on the security
         /// получены дополнительные данные по инструменту
         /// </summary>
-        private void ClientOnUpdateSecurityInfo(SecurityInfo securityInfo)
+        private void ClientOnUpdateSecurityInfo(List<string> securityInfo)
         {
-            try
+            _securityInfos = securityInfo;
+        }
+
+        private void UpdateSecuritiesParallel()
+        {
+            ParallelLoopResult result = Parallel.ForEach<string>(_securityInfos, UpdateSecurity);
+
+            if (result.IsCompleted)
             {
-                var needSec = _securities.Find(s => s.Name == securityInfo.Seccode);
-                if (needSec != null)
+                SecurityEvent?.Invoke(_securities);
+            }
+            else
+            {
+                SendLogMessage("Ошибка обновления инструмента!", LogMessageType.Error);
+            }
+        }
+
+        private void UpdateSecurity(string data)
+        {
+            var securityInfo = _client.Deserialize<SecurityInfo>(data);
+
+            var needSec = _securities.Find(s => s != null && s.Name == securityInfo.Seccode);
+            if (needSec != null)
+            {
+                if (needSec.SecurityType == SecurityType.Option && securityInfo.Bgo_nc != null)
                 {
-                    if (needSec.SecurityType == SecurityType.Option && securityInfo.Bgo_nc != null)
+                    needSec.Go = securityInfo.Bgo_nc.ToDecimal();
+                }
+                else if (needSec.SecurityType == SecurityType.Futures && securityInfo.Sell_deposit != null)
+                {
+                    needSec.Go = securityInfo.Sell_deposit.ToDecimal();
+                    if (securityInfo.Maxprice != null && securityInfo.Minprice != null)
                     {
-                        needSec.Go = securityInfo.Bgo_nc.ToDecimal();
-                    }
-                    else if (needSec.SecurityType == SecurityType.Futures && securityInfo.Sell_deposit != null)
-                    {
-                        needSec.Go = securityInfo.Sell_deposit.ToDecimal();
-                        if (securityInfo.Maxprice != null && securityInfo.Minprice != null)
-                        {
-                            needSec.PriceLimitHigh = securityInfo.Maxprice.ToDecimal();
-                            needSec.PriceLimitLow = securityInfo.Minprice.ToDecimal();
-                        }
+                        needSec.PriceLimitHigh = securityInfo.Maxprice.ToDecimal();
+                        needSec.PriceLimitLow = securityInfo.Minprice.ToDecimal();
                     }
                 }
             }
-            catch (Exception e)
-            {
-                SendLogMessage("Ошибка обновления инструментов " + e, LogMessageType.Error);
-            }
         }
+
+        private ConcurrentBag<string> _transaqSecurities = new ConcurrentBag<string>();
 
         /// <summary>
         /// process the list of new securities
         /// обработать список новых бумаг
         /// </summary>
-        private void HandleSecurities(List<TransaqEntity.Security> securities)
+        private void HandleSecurities(string securities)
         {
-            if (_securities == null)
+            _transaqSecurities.Add(securities);
+        }
+
+        private void CreateSecurities()
+        {
+            ParallelLoopResult result = Parallel.ForEach<string>(_transaqSecurities, CreateSecuritiesParallel);
+
+            if (result.IsCompleted)
             {
-                _securities = new List<Security>();
+                _securities.RemoveAll(s => s == null);
+                SecurityEvent?.Invoke(_securities);
             }
-            foreach (var securityData in securities)
+            else
+            {
+                SendLogMessage("Ошибка создания инструмента!", LogMessageType.Error);
+            }
+        }
+
+        private void CreateSecuritiesParallel(string data)
+        {
+            var transaqSecurities = _client.DeserializeSecurities(data);
+
+            foreach (var securityData in transaqSecurities)
             {
                 try
                 {
-                    if (securityData.Sectype != "FUT" &&
-                        securityData.Sectype != "SHARE" &&
-                        securityData.Sectype != "CURRENCY" &&
-                        securityData.Sectype != "OPT")
+                    if (!CheckFilter(securityData))
                     {
                         continue;
                     }
+
                     Security security = new Security();
 
                     security.Name = securityData.Seccode;
@@ -1081,9 +1149,8 @@ namespace OsEngine.Market.Servers.Transaq
                     security.SecurityType = securityData.Sectype == "FUT" ? SecurityType.Futures
                         : securityData.Sectype == "SHARE" ? SecurityType.Stock
                         : securityData.Sectype == "OPT" ? SecurityType.Option
-                        : securityData.Sectype == "CURRENCY" ? SecurityType.CurrencyPair
+                        : securityData.Sectype == "CURRENCY" || securityData.Sectype == "CETS" ? SecurityType.CurrencyPair
                         : SecurityType.None;
-
 
                     security.Lot = securityData.Lotsize.ToDecimal();
 
@@ -1099,20 +1166,78 @@ namespace OsEngine.Market.Servers.Transaq
                         decimal.TryParse(securityData.Point_cost, NumberStyles.Float, CultureInfo.InvariantCulture, out pointCost);
                     }
 
-                    security.PriceStepCost = security.PriceStep * pointCost / 100;
+                    if (security.PriceStep > 1)
+                    {
+                        security.PriceStepCost = security.PriceStep * pointCost / 100;
+                    }
+                    else
+                    {
+                        security.PriceStepCost = pointCost / 100;
+                    }
 
                     security.State = securityData.Active == "true" ? SecurityStateType.Activ : SecurityStateType.Close;
 
-                    _securities.Add(security);
+                    if (_securities.Contains(security))
+                    {
+                        continue;
+                    }
 
+                    _securities.Add(security);
                 }
                 catch (Exception e)
                 {
                     SendLogMessage(e.Message, LogMessageType.Error);
                 }
             }
-            SecurityEvent?.Invoke(_securities);
         }
+
+        private readonly object _locker = new object();
+
+        private bool CheckFilter(TransaqEntity.Security security)
+        {
+            lock (_locker)
+            {
+                if (security.Sectype == "SHARE")
+                {
+                    if (_useStock)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+                if (security.Sectype == "FUT")
+                {
+                    if (_useFutures)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+                if (security.Sectype == "OPT")
+                {
+                    if (_useOptions)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+                if (security.Sectype == "CETS" || security.Sectype == "CURRENCY")
+                {
+                    if (_useCurrency)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+                if (_useOther)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
 
         /// <summary>
         /// got new ticks from server

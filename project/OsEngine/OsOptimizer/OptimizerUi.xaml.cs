@@ -1,7 +1,5 @@
 ﻿using OsEngine.Entity;
-using OsEngine.Journal;
 using OsEngine.Language;
-using OsEngine.Market;
 using OsEngine.Market.Servers.Tester;
 using OsEngine.OsTrader.Panels;
 using System;
@@ -142,7 +140,19 @@ namespace OsEngine.OsOptimizer
             CheckBoxFilterDealsCount.Content = OsLocalization.Optimizer.Label34;
             ButtonStrategySelect.Content = OsLocalization.Optimizer.Label35;
             Label23.Content = OsLocalization.Optimizer.Label36;
+
+            TabControlResultsSeries.Header = OsLocalization.Optimizer.Label37;
+            TabControlResultsOutOfSampleResults.Header = OsLocalization.Optimizer.Label38;
+            LabelSortBy.Content = OsLocalization.Optimizer.Label39;
+
+
+            _resultsCharting = new OptimizerReportCharting(
+                WindowsFormsHostDependences, WindowsFormsHostColumnsResults,
+                WindowsFormsHostPieResults, ComboBoxSortDependencesResults);
+            _resultsCharting.LogMessageEvent += _master.SendLogMessage;
         }
+
+        private OptimizerReportCharting _resultsCharting;
 
         /// <summary>
         /// an object containing data for optimization
@@ -177,6 +187,7 @@ namespace OsEngine.OsOptimizer
 
             ButtonGo.Content = OsLocalization.Optimizer.Label9;
             TabControlPrime.SelectedItem = TabControlPrime.Items[4];
+            TabControlResults.SelectedItem = TabControlResults.Items[1];
             TabControlPrime.IsEnabled = true;
             ComboBoxThreadsCount.IsEnabled = true;
         }
@@ -188,10 +199,18 @@ namespace OsEngine.OsOptimizer
         void _master_TestReadyEvent(List<OptimazerFazeReport> reports)
         {
             _reports = reports;
+
+            for (int i = 0; i < reports.Count; i++)
+            {
+                SortResults(reports[i].Reports);
+            }
+
             PaintEndOnAllProgressBars();
             PaintTableFazes();
             PaintTableResults();
             StartUserActivity();
+
+            _resultsCharting.ReLoad(reports);
         }
 
         private List<OptimazerFazeReport> _reports;
@@ -1116,15 +1135,25 @@ namespace OsEngine.OsOptimizer
                 }
                 else if (_parameters[i].Type == StrategyParameterType.String)
                 {
-                    DataGridViewComboBoxCell cell = new DataGridViewComboBoxCell();
                     StrategyParameterString param = (StrategyParameterString)_parameters[i];
 
-                    for (int i2 = 0; i2 < param.ValuesString.Count; i2++)
+                    if (param.ValuesString.Count > 1)
                     {
-                        cell.Items.Add(param.ValuesString[i2]);
+                        DataGridViewComboBoxCell cell = new DataGridViewComboBoxCell();
+
+                        for (int i2 = 0; i2 < param.ValuesString.Count; i2++)
+                        {
+                            cell.Items.Add(param.ValuesString[i2]);
+                        }
+                        cell.Value = param.ValueString;
+                        row.Cells.Add(cell);
                     }
-                    cell.Value = param.ValueString;
-                    row.Cells.Add(cell);
+                    else if (param.ValuesString.Count == 1)
+                    {
+                        DataGridViewTextBoxCell cell = new DataGridViewTextBoxCell();
+                        cell.Value = param.ValueString;
+                        row.Cells.Add(cell);
+                    }
                 }
                 else if (_parameters[i].Type == StrategyParameterType.Int)
                 {
@@ -1485,7 +1514,7 @@ namespace OsEngine.OsOptimizer
 
             DataGridViewColumn column0 = new DataGridViewColumn();
             column0.CellTemplate = cell0;
-            column0.HeaderText = "Security";
+            column0.HeaderText = "Bot Name";
             column0.ReadOnly = true;
             column0.Width = 150;
 
@@ -1642,12 +1671,17 @@ namespace OsEngine.OsOptimizer
                 return;
             }
 
-            int num = 0;
-
-            if (_gridFazesEnd.CurrentCell != null
-                && _gridFazesEnd.CurrentCell.RowIndex < _reports.Count)
+            if (_gridFazesEnd.CurrentCell == null)
             {
-                num = _gridFazesEnd.CurrentCell.RowIndex;
+                return;
+            }
+
+            int num = 0;
+            num = _gridFazesEnd.CurrentCell.RowIndex;
+
+            if (num >= _reports.Count)
+            {
+                return;
             }
 
             OptimazerFazeReport fazeReport = _reports[num];
@@ -1656,8 +1690,6 @@ namespace OsEngine.OsOptimizer
             {
                 return;
             }
-
-            SortResults(fazeReport.Reports);
 
             for (int i = 0; i < fazeReport.Reports.Count; i++)
             {
@@ -1673,7 +1705,7 @@ namespace OsEngine.OsOptimizer
 
                 if (fazeReport.Reports[i].TabsReports.Count == 1)
                 {
-                    row.Cells[0].Value = fazeReport.Reports[i].TabsReports[0].SecurityName;
+                    row.Cells[0].Value = fazeReport.Reports[i].BotName;
                 }
                 else
                 {
@@ -1740,7 +1772,7 @@ namespace OsEngine.OsOptimizer
         {
             for (int i = 0; i < reports.Count; i++)
             {
-                for (int i2 = 0; i2 < reports.Count-1; i2++)
+                for (int i2 = 0; i2 < reports.Count - 1; i2++)
                 {
                     if (FirstLessSecond(reports[i2], reports[i2 + 1], _sortBotsType))
                     {
@@ -1973,6 +2005,7 @@ namespace OsEngine.OsOptimizer
 
             ReloadStrategy();
         }
+
 
     }
 

@@ -758,7 +758,28 @@ namespace OsEngine.Language
             "Eng:Bid Ask in trades_" +
             "Ru:Грузим данные bid/ask в трейды_");
 
+        public string UseStock => OsLocalization.ConvertToLocString(
+            "Eng:Stock_" +
+            "Ru:Акции_");
 
+        public string UseFutures => OsLocalization.ConvertToLocString(
+            "Eng:Futures_" +
+            "Ru:Фьючерсы_");
 
+        public string UseOptions => OsLocalization.ConvertToLocString(
+            "Eng:Options_" +
+            "Ru:Опционы_");
+
+        public string UseCurrency => OsLocalization.ConvertToLocString(
+            "Eng:Currency_" +
+            "Ru:Валюты_");
+
+        public string UseOther => OsLocalization.ConvertToLocString(
+            "Eng:Other_" +
+            "Ru:Другое_");
+
+        public string UseSecInfoUpdates => OsLocalization.ConvertToLocString(
+            "Eng:Use sec info updates_" +
+            "Ru:Включить обновления инструментов_");
     }
 }

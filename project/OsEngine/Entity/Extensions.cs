@@ -6,8 +6,29 @@ namespace OsEngine.Entity
 {
     public static class Extensions
     {
+        public static string RemoveExcessFromSecurityName(this string value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            value = value
+                .Replace("/", "")
+                .Replace("*", "")
+                .Replace(":", "")
+                .Replace(";", "");
+
+            return value;
+
+        }
+
         public static decimal ToDecimal(this string value)
         {
+            if(value == null)
+            {
+                return 0;
+            }
             if (value.Contains("E"))
             {
                 return Convert.ToDecimal(value.ToDouble());

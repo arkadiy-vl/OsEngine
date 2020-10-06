@@ -1028,6 +1028,11 @@ namespace OsEngine.Market.Servers
                         }
                     }
 
+                    if (portf[i].ValueCurrent != 0)
+                    {
+
+                    }
+
                     curPortfolio.Profit = portf[i].Profit;
                     curPortfolio.ValueBegin = portf[i].ValueBegin;
                     curPortfolio.ValueCurrent = portf[i].ValueCurrent;
@@ -1642,30 +1647,28 @@ namespace OsEngine.Market.Servers
                     bool isSave = false;
                     for (int i = 0; i < _allTrades.Length; i++)
                     {
-                        if (_allTrades[i] != null && _allTrades[i].Count != 0 &&
-                            _allTrades[i][0].SecurityNameCode == trade.SecurityNameCode)
+                        List<Trade> curList = _allTrades[i];
+
+                        if (curList == null || curList.Count == 0)
                         {
-                            // if there is already storage for this instrument, we save it / если для этого инструметна уже есть хранилище, сохраняем и всё
-                            if (trade.Time < _allTrades[i][_allTrades[i].Count - 1].Time)
-                            {
-                                return;
-                            }
-
-                            Trade tradeBeforeCur = _allTrades[i][_allTrades[i].Count - 1];
-
-                            if (tradeBeforeCur.SecurityNameCode != trade.SecurityNameCode ||
-                                (tradeBeforeCur.Time.AddMinutes(30) > trade.Time &&
-                                 (tradeBeforeCur.Price / trade.Price > 1.1m ||
-                                  tradeBeforeCur.Price / trade.Price < 0.9m)))
-                            {
-                                return;
-                            }
-
-                            _allTrades[i].Add(trade);
-                            myList = _allTrades[i];
-                            isSave = true;
-                            break;
+                            continue;
                         }
+
+                        if (curList[0].SecurityNameCode != trade.SecurityNameCode)
+                        {
+                            continue;
+                        }
+
+                        if (trade.Time < curList[curList.Count - 1].Time)
+                        {
+                            return;
+                        }
+
+                        curList.Add(trade);
+                        myList = curList;
+                        isSave = true;
+                        break;
+
                     }
 
                     if (isSave == false)
@@ -1676,6 +1679,7 @@ namespace OsEngine.Market.Servers
                         {
                             allTradesNew[i] = _allTrades[i];
                         }
+
                         allTradesNew[allTradesNew.Length - 1] = new List<Trade>();
                         allTradesNew[allTradesNew.Length - 1].Add(trade);
                         myList = allTradesNew[allTradesNew.Length - 1];

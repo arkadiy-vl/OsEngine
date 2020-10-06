@@ -9,6 +9,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Xml.Serialization;
 using OsEngine.Market.Servers.Entity;
 using Order = OsEngine.Market.Servers.Transaq.TransaqEntity.Order;
@@ -40,7 +41,7 @@ namespace OsEngine.Market.Servers.Transaq
             ServerIp = serverIp;
             ServerPort = serverPort;
             LogPath = logPath;
-            
+
             _deserializer = new XmlDeserializer();
 
             _myCallbackDelegate = new CallBackDelegate(CallBackDataHandler);
@@ -53,12 +54,16 @@ namespace OsEngine.Market.Servers.Transaq
             converter.Start();
         }
 
+        private bool _loadSecInfoUpdate = false;
+
         /// <summary>
         /// connecto to the exchange
         /// установить соединение с биржей 
         /// </summary>
-        public void Connect()
+        public void Connect(bool loadSecInfoUpdate)
         {
+            _loadSecInfoUpdate = loadSecInfoUpdate;
+
             ConnectorInitialize();
             Thread.Sleep(1000);
 
@@ -73,7 +78,7 @@ namespace OsEngine.Market.Servers.Transaq
             cmd = cmd + "</command>";
 
             // sending the command / отправка команды
-            var res = ConnectorSendCommand(cmd);
+            ConnectorSendCommand(cmd);
         }
 
         /// <summary>
@@ -87,8 +92,7 @@ namespace OsEngine.Market.Servers.Transaq
             cmd = cmd + "</command>";
 
             // sending the command / отправка команды
-            var res = ConnectorSendCommand(cmd);
-
+            ConnectorSendCommand(cmd);
         }
 
         /// <summary>
@@ -136,7 +140,7 @@ namespace OsEngine.Market.Servers.Transaq
 
             if (!pResult.Equals(IntPtr.Zero))
             {
-                string result = MarshalUtf8.PtrToStringUtf8(pResult);
+                MarshalUtf8.PtrToStringUtf8(pResult);
 
                 FreeMemory(pResult);
 
@@ -159,7 +163,7 @@ namespace OsEngine.Market.Servers.Transaq
 
             if (!pResult.Equals(IntPtr.Zero))
             {
-                String result = MarshalUtf8.PtrToStringUtf8(pResult);
+                MarshalUtf8.PtrToStringUtf8(pResult);
                 FreeMemory(pResult);
                 return false;
             }
@@ -176,7 +180,7 @@ namespace OsEngine.Market.Servers.Transaq
         /// queue of new messages from server
         /// очередь новых сообщений, пришедших с сервера биржи
         /// </summary>
-        private ConcurrentQueue<string> _newMessage = new ConcurrentQueue<string>();
+        private readonly ConcurrentQueue<string> _newMessage = new ConcurrentQueue<string>();
 
         /// <summary>
         /// processor of data from callbacks 
@@ -213,6 +217,8 @@ namespace OsEngine.Market.Servers.Transaq
             return result;
         }
 
+        private List<string> _securityInfos = new List<string>();
+
         /// <summary>
         /// takes messages from the shared queue, converts them to C# classes, and sends them to up
         /// берет сообщения из общей очереди, конвертирует их в классы C# и отправляет на верх
@@ -239,35 +245,41 @@ namespace OsEngine.Market.Servers.Transaq
                                 continue;
                             }
 
-                            if (data.StartsWith("<server_status"))
+                            if (data.StartsWith("<sec_info_upd>"))
                             {
-                                ServerStatus status = Deserialize<ServerStatus>(data);
-                                
-                                if (status.Connected == "true")
+                                if (!_loadSecInfoUpdate)
                                 {
-                                    IsConnected = true;
-                                    Connected?.Invoke();
+                                    continue;
                                 }
-                                else if (status.Connected == "false")
-                                {
-                                    IsConnected = false;
-                                    Disconnected?.Invoke();
-                                }
-                                else if (status.Connected == "error")
-                                {
-                                    SendLogMessage(status.Text, LogMessageType.Error);
-                                }
+                                _securityInfos.Add(data);
+                                continue;
                             }
                             else if (data.StartsWith("<securities>"))
                             {
-                                var securities = _deserializer.Deserialize<List<Security>>(new RestResponse() { Content = data });
+                                UpdatePairs?.Invoke(data);
+                            }
+                            else if (data.StartsWith("<quotes>"))
+                            {
+                                var quotes = _deserializer.Deserialize<List<Quote>>(new RestResponse() { Content = data });
 
-                                UpdatePairs?.Invoke(securities);
+                                UpdateMarketDepth?.Invoke(quotes);
+                            }
+                            else if (data.StartsWith("<trades>"))
+                            {
+                                var myTrades = _deserializer.Deserialize<List<Trade>>(new RestResponse() { Content = data });
+
+                                MyTradeEvent?.Invoke(myTrades);
+                            }
+                            else if (data.StartsWith("<alltrades>"))
+                            {
+                                var allTrades = _deserializer.Deserialize<List<Trade>>(new RestResponse() { Content = data });
+
+                                NewTradesEvent?.Invoke(allTrades);
                             }
                             else if (data.StartsWith("<united_portfolio"))
                             {
                                 UnitedPortfolio unitedPortfolio = Deserialize<UnitedPortfolio>(data);
-                                
+
                                 UpdatePortfolio?.Invoke(unitedPortfolio);
                             }
                             else if (data.StartsWith("<positions"))
@@ -288,34 +300,16 @@ namespace OsEngine.Market.Servers.Transaq
 
                                 ClientsInfo?.Invoke(clientInfo);
                             }
-                            else if (data.StartsWith("<alltrades>"))
-                            {
-                                var allTrades = _deserializer.Deserialize<List<Trade>>(new RestResponse() { Content = data });
-
-                                NewTradesEvent?.Invoke(allTrades);
-                            }
-                            else if (data.StartsWith("<quotes>"))
-                            {
-                                var quotes = _deserializer.Deserialize<List<Quote>>(new RestResponse() { Content = data });
-
-                                UpdateMarketDepth?.Invoke(quotes);
-                            }
                             else if (data.StartsWith("<orders>"))
                             {
                                 var orders = _deserializer.Deserialize<List<Order>>(new RestResponse() { Content = data });
 
                                 MyOrderEvent?.Invoke(orders);
                             }
-                            else if (data.StartsWith("<trades>"))
-                            {
-                                var myTrades = _deserializer.Deserialize<List<Trade>>(new RestResponse() { Content = data });
-
-                                MyTradeEvent?.Invoke(myTrades);
-                            }
                             else if (data.StartsWith("<candles"))
                             {
                                 Candles newCandles = Deserialize<Candles>(data);
-                                
+
                                 NewCandles?.Invoke(newCandles);
                             }
                             else if (data.StartsWith("<messages>"))
@@ -325,11 +319,26 @@ namespace OsEngine.Market.Servers.Transaq
                                     NeedChangePassword?.Invoke();
                                 }
                             }
-                            else if (data.StartsWith("<sec_info_upd>"))
+                            else if (data.StartsWith("<server_status"))
                             {
-                                var secInfo = Deserialize<SecurityInfo>(data);
+                                UpdateSecurity?.Invoke(_securityInfos);
 
-                                UpdateSecurity?.Invoke(secInfo);
+                                ServerStatus status = Deserialize<ServerStatus>(data);
+
+                                if (status.Connected == "true")
+                                {
+                                    IsConnected = true;
+                                    Connected?.Invoke();
+                                }
+                                else if (status.Connected == "false")
+                                {
+                                    IsConnected = false;
+                                    Disconnected?.Invoke();
+                                }
+                                else if (status.Connected == "error")
+                                {
+                                    SendLogMessage(status.Text, LogMessageType.Error);
+                                }
                             }
                         }
                     }
@@ -350,15 +359,20 @@ namespace OsEngine.Market.Servers.Transaq
         /// <typeparam name="T">type for converting / тип, в который нужно преобразовать данные</typeparam>
         /// <param name="data">data string / строка с данными</param>
         /// <returns>nessesary object / объект нужного типа</returns>
-        private T Deserialize<T>(string data)
+        public T Deserialize<T>(string data)
         {
             T newData;
             var formatter = new XmlSerializer(typeof(T));
             using (StringReader fs = new StringReader(data))
             {
-                newData = (T)formatter.Deserialize(fs);                
+                newData = (T)formatter.Deserialize(fs);
             }
             return newData;
+        }
+
+        public List<Security> DeserializeSecurities(string data)
+        {
+            return _deserializer.Deserialize<List<Security>>(new RestResponse() { Content = data }); ;
         }
 
         #region outgoing events / Исходящие события
@@ -385,7 +399,7 @@ namespace OsEngine.Market.Servers.Transaq
         /// new security in the system
         /// новые бумаги в системе
         /// </summary>
-        public event Action<List<Security>> UpdatePairs;
+        public event Action<string> UpdatePairs;
 
         /// <summary>
         /// updated portfolios
@@ -445,7 +459,8 @@ namespace OsEngine.Market.Servers.Transaq
         /// updated security
         /// обновились данные по инструменту
         /// </summary>
-        public event Action<SecurityInfo> UpdateSecurity;
+        public event Action<List<string>> UpdateSecurity;
+
 
         #endregion
 

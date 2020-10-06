@@ -45,6 +45,8 @@ using OsEngine.Market.Servers.MOEX;
 using OsEngine.Market.Servers.Tinkoff;
 using MessageBox = System.Windows.MessageBox;
 using OsEngine.Market.Servers.GateIo.Futures;
+using OsEngine.Market.Servers.FTX;
+using OsEngine.Market.Servers.Bybit;
 
 namespace OsEngine.Market
 {
@@ -100,6 +102,8 @@ namespace OsEngine.Market
                 serverTypes.Add(ServerType.HuobiSpot);
                 serverTypes.Add(ServerType.HuobiFutures);
                 serverTypes.Add(ServerType.HuobiFuturesSwap);
+                serverTypes.Add(ServerType.FTX);
+                serverTypes.Add(ServerType.Bybit);
 
                 serverTypes.Add(ServerType.InteractivBrokers);
                 serverTypes.Add(ServerType.NinjaTrader);
@@ -196,6 +200,10 @@ namespace OsEngine.Market
                 }
 
                 IServer newServer = null;
+                if (type == ServerType.FTX)
+                {
+                    newServer = new FTXServer();
+                }
                 if (type == ServerType.HuobiFuturesSwap)
                 {
                     newServer = new HuobiFuturesSwapServer();
@@ -232,6 +240,10 @@ namespace OsEngine.Market
                 {
                     newServer = new GateIoFuturesServer();
                 }
+                if (type == ServerType.Bybit)
+                {
+                    newServer = new BybitServer();
+                }
                 if (type == ServerType.Zb)
                 {
                     newServer = new ZbServer();
@@ -246,7 +258,7 @@ namespace OsEngine.Market
                 }
                 if (type == ServerType.BitMax)
                 {
-                    newServer = new BitMaxServer();
+                    newServer = new BitMaxProServer();
                 }
                 if (type == ServerType.Transaq)
                 {
@@ -388,6 +400,24 @@ namespace OsEngine.Market
             }
         }
 
+        public static void RemoveOptimizerServer(OptimizerServer server)
+        {
+            for (int i = 0; _servers != null && i < _servers.Count; i++)
+            {
+                if (_servers[i] == null)
+                {
+                    _servers.RemoveAt(i);
+                    i--;
+                }
+                if (_servers[i].ServerType == ServerType.Optimizer &&
+                    ((OptimizerServer)_servers[i]).NumberServer == server.NumberServer)
+                {
+                    _servers.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+
         /// <summary>
         /// take the server
         /// взять сервер
@@ -411,6 +441,20 @@ namespace OsEngine.Market
         {
             IServerPermission serverPermission = null;
 
+
+            if (type == ServerType.Bitfinex)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
+
+                if (serverPermission == null)
+                {
+                    serverPermission = new BitFinexServerPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
+
             if (type == ServerType.MoexDataServer)
             {
                 serverPermission = _serversPermissions.Find(s => s.ServerType == type);
@@ -430,6 +474,18 @@ namespace OsEngine.Market
                 if (serverPermission == null)
                 {
                     serverPermission = new MfdServerPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
+            if (type == ServerType.Finam)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
+
+                if (serverPermission == null)
+                {
+                    serverPermission = new FinamServerPermission();
                     _serversPermissions.Add(serverPermission);
                 }
 
@@ -495,7 +551,18 @@ namespace OsEngine.Market
 
                 return serverPermission;
             }
+            if (type == ServerType.Bybit)
+            {
+                serverPermission = _serversPermissions.Find(s => s.ServerType == type);
 
+                if (serverPermission == null)
+                {
+                    serverPermission = new BybitServerPermission();
+                    _serversPermissions.Add(serverPermission);
+                }
+
+                return serverPermission;
+            }
 
             return null;
         }
@@ -578,12 +645,19 @@ namespace OsEngine.Market
                 _needServerTypes = new List<ServerType>();
             }
 
-            for (int i = 0; i < _needServerTypes.Count; i++)
+            try
             {
-                if (_needServerTypes[i] == type)
+                for (int i = 0; i < _needServerTypes.Count; i++)
                 {
-                    return;
+                    if (_needServerTypes[i] == type)
+                    {
+                        return;
+                    }
                 }
+            }
+            catch
+            {
+                // ignore
             }
 
             _needServerTypes.Add(type);
@@ -790,6 +864,12 @@ namespace OsEngine.Market
         Hitbtc,
 
         /// <summary>
+        /// cryptocurrency exchange FTX
+        /// биржа криптовалют FTX
+        /// </summary>
+        FTX,
+
+        /// <summary>
         /// cryptocurrency exchange Gate.io
         /// биржа криптовалют Gate.io
         /// </summary>
@@ -967,7 +1047,11 @@ namespace OsEngine.Market
         /// <summary>
         /// Huobi Futures Swap
         /// </summary>
-        HuobiFuturesSwap
-    }
+        HuobiFuturesSwap,
 
+        /// <summary>
+        /// Bybit exchange
+        /// </summary>
+        Bybit
+    }
 }

@@ -145,7 +145,9 @@ namespace OsEngine.OsOptimizer
                 tab.PositionsCount = positions.Count;
                 tab.TotalProfit = PositionStaticticGenerator.GetAllProfitInPunkt(posesArray);
                 tab.MaxDrowDawn = PositionStaticticGenerator.GetMaxDownPersent(posesArray);
-                tab.AverageProfit = PositionStaticticGenerator.GetMidleProfitInPunkt(posesArray);
+
+                tab.AverageProfit = tab.TotalProfit / (posesArray.Length+1);
+                
                 tab.AverageProfitPercent = PositionStaticticGenerator.GetMidleProfitInPersent(posesArray);
 
                 tab.ProfitFactor = PositionStaticticGenerator.GetProfitFactor(posesArray);
@@ -231,6 +233,5 @@ namespace OsEngine.OsOptimizer
         public decimal PayOffRatio;
 
         public decimal Recovery;
-
     }
 }

@@ -14,7 +14,6 @@ using System.Windows.Shapes;
 using OsEngine.Alerts;
 using OsEngine.Charts.CandleChart;
 using OsEngine.Charts.CandleChart.Elements;
-using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Entity;
 using OsEngine.Indicators;
 using OsEngine.Language;
@@ -25,7 +24,6 @@ using OsEngine.Market.Servers;
 using OsEngine.Market.Servers.Optimizer;
 using OsEngine.Market.Servers.Tester;
 using OsEngine.OsTrader.Panels.Tab.Internal;
-using Chart = System.Windows.Forms.DataVisualization.Charting.Chart;
 
 namespace OsEngine.OsTrader.Panels.Tab
 {
@@ -112,9 +110,8 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="serverType">server type / тип сервера у коннектора</param>
         void _connector_ConnectorStartedReconnectEvent(string securityName, TimeFrame timeFrame, TimeSpan timeFrameSpan, string portfolioName, ServerType serverType)
         {
-            if (string.IsNullOrEmpty(securityName)// ||
-                                                  //string.IsNullOrEmpty(portfolioName)
-                )
+            _chartMaster.ClearTimePoints();
+            if (string.IsNullOrEmpty(securityName))
             {
                 return;
             }
@@ -1135,6 +1132,18 @@ namespace OsEngine.OsTrader.Panels.Tab
         // standard public functions for position management
         // стандартные публичные функции для управления позицией
 
+        private bool IsMarketOrderSupport()
+        {
+            if (_connector.ServerType == ServerType.InteractivBrokers ||
+                _connector.ServerType == ServerType.Lmax ||
+                _connector.ServerType == ServerType.BitMax)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// enter a long position at any price / 
         /// войти в позицию Лонг по любой цене
@@ -1158,7 +1167,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 TimeSpan timeLife = ManualPositionSupport.SecondToOpen;
 
-                if (_connector.ServerType == ServerType.InteractivBrokers || _connector.ServerType == ServerType.Lmax)
+                if (IsMarketOrderSupport())
                 {
                     return LongCreate(price, volume, type, timeLife, false);
                 }
@@ -1350,16 +1359,18 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="priceRedLine">line price / цена линии, после достижения которой будет выставлен ордер на покупку</param>
         /// <param name="activateType">activation type / тип активации ордера</param>
         /// /// <param name="expiresBars">life time in candels count / время жизни ордера в барах</param>
-        public void BuyAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, int expiresBars)
+        public void BuyAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, int expiresBars, string signalType)
         {
             try
             {
-                PositionOpenerToStop positionOpener = new PositionOpenerToStop(CandlesFinishedOnly.Count, expiresBars);
+                PositionOpenerToStop positionOpener = 
+                    new PositionOpenerToStop(CandlesFinishedOnly.Count, expiresBars,TimeServerCurrent);
                 positionOpener.Volume = volume;
                 positionOpener.PriceOrder = priceLimit;
                 positionOpener.PriceRedLine = priceRedLine;
                 positionOpener.ActivateType = activateType;
                 positionOpener.Side = Side.Buy;
+                positionOpener.SignalType = signalType;
 
                 _stopsOpener.Add(positionOpener);
             }
@@ -1368,6 +1379,20 @@ namespace OsEngine.OsTrader.Panels.Tab
                 SetNewLogMessage(error.ToString(), LogMessageType.Error);
             }
 
+        }
+
+        /// <summary>
+        /// enter position Long at price intersection / 
+        /// купить по пересечению цены
+        /// </summary>
+        /// <param name="volume">volume / объём</param>
+        /// <param name="priceLimit">order price / цена ордера</param>
+        /// <param name="priceRedLine">line price / цена линии, после достижения которой будет выставлен ордер на покупку</param>
+        /// <param name="activateType">activation type / тип активации ордера</param>
+        /// /// <param name="expiresBars">life time in candels count / время жизни ордера в барах</param>
+        public void BuyAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, int expiresBars)
+        {
+            BuyAtStop(volume, priceLimit, priceRedLine, activateType, expiresBars, "");
         }
 
         /// <summary>
@@ -1380,7 +1405,21 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="activateType">activation type / тип активации ордера</param>
         public void BuyAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType)
         {
-            BuyAtStop(volume, priceLimit, priceRedLine, activateType, 1);
+            BuyAtStop(volume, priceLimit, priceRedLine, activateType, 1, "");
+        }
+
+        /// <summary>
+        /// enter position Long at price intersection. work one candle / 
+        /// купить по пересечению цены. Действует одну свечку
+        /// </summary>
+        /// <param name="volume">volume / объём</param>
+        /// <param name="priceLimit">order price / цена ордера</param>
+        /// <param name="priceRedLine">line price / цена линии, после достижения которой будет выставлен ордер на покупку</param>
+        /// <param name="activateType">activation type / тип активации ордера</param>
+        /// <param name="signalType">the opening signal. It will be written to the position as SignalTypeOpen / тип сигнала на открытие. Будет записано в позицию как SignalTypeOpen</param>
+        public void BuyAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, string signalType)
+        {
+            BuyAtStop(volume, priceLimit, priceRedLine, activateType, 1, signalType);
         }
 
         /// <summary>
@@ -1590,7 +1629,7 @@ namespace OsEngine.OsTrader.Panels.Tab
 
                 TimeSpan timeLife = ManualPositionSupport.SecondToOpen;
 
-                if (_connector.ServerType == ServerType.InteractivBrokers || _connector.ServerType == ServerType.Lmax)
+                if (IsMarketOrderSupport())
                 {
                     return ShortCreate(price, volume, type, timeLife, false);
                 }
@@ -1779,16 +1818,20 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="priceRedLine">line price / цена линии, после достижения которой будет выставлен ордер на продажу</param>
         /// <param name="activateType">activation type /тип активации ордера</param>
         /// <param name="expiresBars">life time in candels count / через сколько свечей заявка будет снята</param>
-        public void SellAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, int expiresBars)
+        /// <param name="signalType">the opening signal. It will be written to the position as SignalTypeOpen / тип сигнала на открытие. Будет записано в позицию как SignalTypeOpen</param>
+        public void SellAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, int expiresBars, string signalType)
         {
             try
             {
-                PositionOpenerToStop positionOpener = new PositionOpenerToStop(CandlesFinishedOnly.Count, expiresBars);
+                PositionOpenerToStop positionOpener = 
+                    new PositionOpenerToStop(CandlesFinishedOnly.Count, expiresBars, TimeServerCurrent);
+
                 positionOpener.Volume = volume;
                 positionOpener.PriceOrder = priceLimit;
                 positionOpener.PriceRedLine = priceRedLine;
                 positionOpener.ActivateType = activateType;
                 positionOpener.Side = Side.Sell;
+                positionOpener.SignalType = signalType;
 
                 _stopsOpener.Add(positionOpener);
             }
@@ -1796,6 +1839,20 @@ namespace OsEngine.OsTrader.Panels.Tab
             {
                 SetNewLogMessage(error.ToString(), LogMessageType.Error);
             }
+        }
+
+        /// <summary>
+        /// enter position Short at price intersection / 
+        /// продать по пересечению цены
+        /// </summary>
+        /// <param name="volume">volume / объём</param>
+        /// <param name="priceLimit">order price / цена ордера</param>
+        /// <param name="priceRedLine">line price / цена линии, после достижения которой будет выставлен ордер на продажу</param>
+        /// <param name="activateType">activation type /тип активации ордера</param>
+        /// <param name="expiresBars">life time in candels count / через сколько свечей заявка будет снята</param>
+        public void SellAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, int expiresBars)
+        {
+            SellAtStop(volume, priceLimit, priceRedLine, activateType, expiresBars, "");
         }
 
         /// <summary>
@@ -1808,7 +1865,21 @@ namespace OsEngine.OsTrader.Panels.Tab
         /// <param name="activateType">activation type /тип активации ордера</param>
         public void SellAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType)
         {
-            SellAtStop(volume, priceLimit, priceRedLine, activateType, 1);
+            SellAtStop(volume, priceLimit, priceRedLine, activateType, 1, "");
+        }
+
+        /// <summary>
+        /// enter position Short at price intersection. Work one candle / 
+        /// продать по пересечению цены. Работает одну свечу
+        /// </summary>
+        /// <param name="volume">volume / объём</param>
+        /// <param name="priceLimit">order price / цена ордера</param>
+        /// <param name="priceRedLine">line price / цена линии, после достижения которой будет выставлен ордер на продажу</param>
+        /// <param name="activateType">activation type /тип активации ордера</param>
+        /// <param name="signalType">the opening signal. It will be written to the position as SignalTypeOpen / тип сигнала на открытие. Будет записано в позицию как SignalTypeOpen</param>
+        public void SellAtStop(decimal volume, decimal priceLimit, decimal priceRedLine, StopActivateType activateType, string signalType)
+        {
+            SellAtStop(volume, priceLimit, priceRedLine, activateType, 1, signalType);
         }
 
         /// <summary>
@@ -2050,7 +2121,7 @@ namespace OsEngine.OsTrader.Panels.Tab
                     return;
                 }
 
-                if (_connector.ServerType == ServerType.InteractivBrokers || _connector.ServerType == ServerType.Lmax)
+                if (IsMarketOrderSupport())
                 {
                     if (position.OpenVolume <= volume)
                     {
@@ -3320,6 +3391,11 @@ namespace OsEngine.OsTrader.Panels.Tab
                             Position pos = LongCreate(_stopsOpener[i].PriceOrder, _stopsOpener[i].Volume, OrderPriceType.Limit,
                                 ManualPositionSupport.SecondToOpen, true);
 
+                            if (pos != null)
+                            {
+                                pos.SignalTypeOpen = opener.SignalType;
+                            }
+
                             if (_stopsOpener.Count == 0)
                             { // пользователь может удалить сам из слоя увидив что сделка открыается
                                 return;
@@ -3336,6 +3412,11 @@ namespace OsEngine.OsTrader.Panels.Tab
                             PositionOpenerToStop opener = _stopsOpener[i];
                             Position pos = ShortCreate(_stopsOpener[i].PriceOrder, _stopsOpener[i].Volume, OrderPriceType.Limit,
                                 ManualPositionSupport.SecondToOpen, true);
+
+                            if (pos != null)
+                            {
+                                pos.SignalTypeOpen = opener.SignalType;
+                            }
 
                             if (_stopsOpener.Count == 0)
                             { // пользователь может удалить сам из слоя увидив что сделка открыается

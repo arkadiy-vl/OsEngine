@@ -78,6 +78,16 @@ namespace OsEngine.Indicators
 
             results.AddRange(files.ToList());
 
+            for (int i = 0; i < results.Count; i++)
+            {
+                if (results.Contains("Dlls"))
+                {
+                    results.RemoveAt(i);
+                    i--;
+                    continue;
+                }
+            }
+
             return results;
         }
 
@@ -133,43 +143,118 @@ namespace OsEngine.Indicators
             return Indicator;
         }
 
+        private static bool _isFirstTime = true;
+
+        private static string[] linksToDll;
+
         private static Aindicator Serialize(string path, string nameClass, string name, bool canDelete)
         {
             try
             {
-                Aindicator result = null;
-
-                string fileStr = ReadFile(path);
-
-                CSharpCodeProvider prov = new CSharpCodeProvider();
-
-                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-
-                var res = Array.ConvertAll<Assembly, string>(assemblies, (x) =>
+                if (linksToDll == null)
                 {
-                    if (!x.IsDynamic)
+                    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+                    var res = Array.ConvertAll<Assembly, string>(assemblies, (x) =>
                     {
-                        return x.Location;
+                        if (!x.IsDynamic)
+                        {
+                            return x.Location;
+                        }
+
+                        return null;
+                    });
+
+                    for (int i = 0; i < res.Length; i++)
+                    {
+                        if (string.IsNullOrEmpty(res[i]))
+                        {
+                            List<string> list = res.ToList();
+                            list.RemoveAt(i);
+                            res = list.ToArray();
+                            i--;
+                        }
+                        else if (res[i].Contains("System.Runtime.Serialization")
+                                 || i > 24)
+                        {
+                            List<string> list = res.ToList();
+                            list.RemoveAt(i);
+                            res = list.ToArray();
+                            i--;
+                        }
                     }
 
-                    return null;
-                });
+                    string dllPath = AppDomain.CurrentDomain.BaseDirectory + "System.Runtime.Serialization.dll";
 
-                CompilerParameters cp = new CompilerParameters(res);
+                    List<string> listRes = res.ToList();
+                    listRes.Add(dllPath);
+                    res = listRes.ToArray();
+
+                    linksToDll = res;
+                }
+
+                List<string> dllsToCompiler = linksToDll.ToList();
+
+                List<string> dllsFromPath = GetDllsPathFromFolder(path);
+
+                if (dllsFromPath != null && dllsFromPath.Count != 0)
+                {
+                    for (int i = 0; i < dllsFromPath.Count; i++)
+                    {
+                        string dll = dllsFromPath[i].Split('\\')[dllsFromPath[i].Split('\\').Length - 1];
+
+                        if (dllsToCompiler.Find(d => d.Contains(dll)) == null)
+                        {
+                            dllsToCompiler.Add(dllsFromPath[i]);
+                        }
+                    }
+                }
+
+
+                CompilerParameters cp = new CompilerParameters(dllsToCompiler.ToArray());
                 cp.IncludeDebugInformation = true;
                 cp.GenerateInMemory = true;
-                cp.TempFiles.KeepFiles = false;
-                
 
-               /* string folderCur = AppDomain.CurrentDomain.BaseDirectory + "Engine\\Temp";
+                string folderCur = AppDomain.CurrentDomain.BaseDirectory + "Engine\\Temp";
 
                 if (Directory.Exists(folderCur) == false)
                 {
                     Directory.CreateDirectory(folderCur);
                 }
 
-                cp.OutputAssembly = folderCur + "\\tempInd" + nameClass +
-                                    NumberGen.GetNumberDeal(StartProgram.IsOsTrader);*/
+                folderCur += "\\Indicators";
+
+                if (Directory.Exists(folderCur) == false)
+                {
+                    Directory.CreateDirectory(folderCur);
+                }
+
+                if (_isFirstTime)
+                {
+                    _isFirstTime = false;
+
+                    string[] files = Directory.GetFiles(folderCur);
+
+                    for (int i = 0; i < files.Length; i++)
+                    {
+                        try
+                        {
+                            File.Delete(files[i]);
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                    }
+                }
+
+                cp.TempFiles = new TempFileCollection(folderCur, false);
+
+                Aindicator result = null;
+
+                string fileStr = ReadFile(path);
+
+                CSharpCodeProvider prov = new CSharpCodeProvider();
 
                 CompilerResults results = prov.CompileAssemblyFromSource(cp, fileStr);
 
@@ -200,6 +285,34 @@ namespace OsEngine.Indicators
             {
                 throw new Exception(e.ToString());
             }
+        }
+
+        private static List<string> GetDllsPathFromFolder(string path)
+        {
+            string folderPath = path.Remove(path.LastIndexOf('\\'), path.Length - path.LastIndexOf('\\'));
+
+            if (Directory.Exists(folderPath + "\\Dlls") == false)
+            {
+                return null;
+            }
+
+            string[] filesInFolder = Directory.GetFiles(folderPath + "\\Dlls");
+
+            List<string> dlls = new List<string>();
+
+            for (int i = 0; i < filesInFolder.Length; i++)
+            {
+                if (filesInFolder[i].EndsWith(".dll") == false)
+                {
+                    continue;
+                }
+
+                string dllPath = AppDomain.CurrentDomain.BaseDirectory + filesInFolder[i];
+
+                dlls.Add(dllPath);
+            }
+
+            return dlls;
         }
 
         private static string ReadFile(string path)

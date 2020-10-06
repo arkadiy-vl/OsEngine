@@ -83,7 +83,14 @@ namespace OsEngine.Entity
                 _specification = result.ToString();
 
                 _specification =
-                    _specification.Replace("(", "").Replace(")", "").Replace(" ", "").Replace("\"", "");
+                    _specification.Replace("(", "")
+                        .Replace(")", "")
+                        .Replace(" ", "")
+                        .Replace("\"", "")
+                        .Replace("\\", "")
+                        .Replace(";", "")
+                        .Replace(":", "")
+                        .Replace("/", "");
 
 
                 return _specification;
