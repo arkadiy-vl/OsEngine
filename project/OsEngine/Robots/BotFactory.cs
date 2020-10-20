@@ -280,7 +280,11 @@ namespace OsEngine.Robots
             {
                 bot = new PairArbitrage(name, startProgram);
             }
-
+            if (nameClass == "OneLegArbitrageGrid")
+            {
+                bot = new OneLegArbitrageGrid(name, startProgram);
+            }
+            
             return bot;
         }
         
