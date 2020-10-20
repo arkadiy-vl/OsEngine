@@ -14,6 +14,7 @@ using System.Threading;
 using Microsoft.CSharp;
 using OsEngine.Entity;
 using OsEngine.OsTrader.Panels;
+using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.Robots.CounterTrend;
 using OsEngine.Robots.Engines;
 using OsEngine.Robots.High_Frequency;
@@ -28,6 +29,8 @@ namespace OsEngine.Robots
 {
     public class BotFactory
     {
+        private static readonly Dictionary<string, Type> BotsWithAttribute = GetTypesWithBotAttribute();
+        
         /// <summary>
         /// list robots name / 
         /// список доступных роботов
@@ -44,7 +47,6 @@ namespace OsEngine.Robots
             result.Add("MarketMakerBot");
             result.Add("PatternTrader");
             result.Add("HighFrequencyTrader");
-            result.Add("Bollinger");
             result.Add("EnvelopTrend");
             result.Add("Williams Band");
             result.Add("TwoLegArbitrage");
@@ -71,6 +73,7 @@ namespace OsEngine.Robots
             result.Add("PriceChannelVolatility");
             result.Add("RsiTrade");
             result.Add("RviTrade");
+            result.AddRange(BotsWithAttribute.Keys);
             result.Add("BollingerTrend");
             result.Add("ArbitrageOneLeg");
             result.Add("PairArbitrage");
@@ -116,7 +119,6 @@ namespace OsEngine.Robots
                 bot = CreateScriptStrategyByName(nameClass, name, startProgram);
                 return bot;
             }
-
             
             if (nameClass == "TimeOfDayBot")
             {
@@ -225,10 +227,6 @@ namespace OsEngine.Robots
             {
                 bot = new MarketMakerBot(name, startProgram);
             }
-            if (nameClass == "Bollinger")
-            {
-                bot = new StrategyBollinger(name, startProgram);
-            }
             if (nameClass == "ParabolicSarTrade")
             {
                 bot = new ParabolicSarTrade(name, startProgram);
@@ -265,6 +263,11 @@ namespace OsEngine.Robots
             {
                 bot = new PairTraderSpreadSma(name, startProgram);
             }
+            if (BotsWithAttribute.ContainsKey(nameClass))
+            {
+                Type botType = BotsWithAttribute[nameClass];
+                bot = (BotPanel) Activator.CreateInstance(botType, name, startProgram);
+            }
             if (nameClass == "BollingerTrend")
             {
                 bot = new BollingerTrend(name, startProgram);
@@ -278,16 +281,26 @@ namespace OsEngine.Robots
                 bot = new PairArbitrage(name, startProgram);
             }
 
-            if (nameClass == "OneLegArbitrageGrid")
+            return bot;
+        }
+        
+        static Dictionary<string, Type> GetTypesWithBotAttribute()
+        {
+            Assembly assembly = Assembly.GetAssembly(typeof(BotPanel));
+            Dictionary<string, Type> bots = new Dictionary<string, Type>();
+            foreach(Type type in assembly.GetTypes())
             {
-                bot = new OneLegArbitrageGrid(name, startProgram);
+                object[] attributes = type.GetCustomAttributes(typeof(BotAttribute), false);
+                if (attributes.Length > 0)
+                {
+                    bots[((BotAttribute) attributes[0]).Name] = type;
+                }
             }
 
-            return bot;
+            return bots;
         }
 
         // Scripts
-
         public static List<string> GetScriptsNamesStrategy()
         {
             if (Directory.Exists(@"Custom") == false)
