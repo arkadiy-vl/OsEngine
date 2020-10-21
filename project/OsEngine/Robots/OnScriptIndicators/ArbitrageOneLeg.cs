@@ -2,12 +2,15 @@
 using System.Collections.Generic;
 using OsEngine.Entity;
 using OsEngine.Indicators;
-using OsEngine.OsTrader.Panels.Tab;
 using OsEngine.OsTrader.Panels;
+using OsEngine.OsTrader.Panels.Tab;
+using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.Charts.CandleChart.Indicators;
+
 
 namespace OsEngine.Robots.OnScriptIndicators
 {
+    [Bot("ArbitrageOneLeg")]
     public class ArbitrageOneLeg : BotPanel
     {
         //Вкладки бота
@@ -56,8 +59,7 @@ namespace OsEngine.Robots.OnScriptIndicators
 
         //Имя программы, которая запустила бота
         private StartProgram startProgram;
-
-
+        
         public ArbitrageOneLeg(string name, StartProgram _startProgram) : base(name, _startProgram)
         {
             //Запоминаем имя программы, которая запустила бота

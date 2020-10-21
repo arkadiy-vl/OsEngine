@@ -5,10 +5,12 @@ using System.Text;
 using System.Threading.Tasks;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Tab;
+using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.Entity;
 using OsEngine.Charts.CandleChart.Indicators;
 using System.IO;
 using System.Windows;
+
 
 namespace OsEngine.Robots.MyBot
 {
@@ -16,6 +18,7 @@ namespace OsEngine.Robots.MyBot
     /// Робот для парного межбиржевого арбитража из курса OsEngine - Арбитраж
     /// Торгует при изменении спреда
     /// </summary>
+    [Bot("PairArbitrage")]
     public class PairArbitrage : BotPanel
     {
         #region Параметры робота

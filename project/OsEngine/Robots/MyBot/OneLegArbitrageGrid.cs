@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using OsEngine.OsTrader;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Tab;
+using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.Entity;
 using OsEngine.Charts.CandleChart.Indicators;
 using System.IO;
@@ -14,11 +15,11 @@ using System.Windows;
 
 namespace OsEngine.Robots.MyBot
 {
-
     /// <summary>
     /// Робот для одноного арбитража относительно индекса из курса OsEngine - Арбитраж
     /// В данном роботе надо отключать сопровождение позиции
     /// </summary>
+    [Bot("OneLegArbitrageGrid")]
     public class OneLegArbitrageGrid : BotPanel
     {
         #region Параметры робота

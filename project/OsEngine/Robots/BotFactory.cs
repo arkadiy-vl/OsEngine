@@ -74,10 +74,6 @@ namespace OsEngine.Robots
             result.Add("RsiTrade");
             result.Add("RviTrade");
             result.AddRange(BotsWithAttribute.Keys);
-            result.Add("BollingerTrend");
-            result.Add("ArbitrageOneLeg");
-            result.Add("PairArbitrage");
-            result.Add("OneLegArbitrageGrid");
 
             List<string> resultTrue = new List<string>();
 
@@ -267,22 +263,6 @@ namespace OsEngine.Robots
             {
                 Type botType = BotsWithAttribute[nameClass];
                 bot = (BotPanel) Activator.CreateInstance(botType, name, startProgram);
-            }
-            if (nameClass == "BollingerTrend")
-            {
-                bot = new BollingerTrend(name, startProgram);
-            }
-            if (nameClass == "ArbitrageOneLeg")
-            {
-                bot = new ArbitrageOneLeg(name, startProgram);
-            }
-            if (nameClass == "PairArbitrage")
-            {
-                bot = new PairArbitrage(name, startProgram);
-            }
-            if (nameClass == "OneLegArbitrageGrid")
-            {
-                bot = new OneLegArbitrageGrid(name, startProgram);
             }
             
             return bot;

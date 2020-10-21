@@ -5,11 +5,13 @@ using System.Text;
 using OsEngine.Entity;
 using OsEngine.OsTrader.Panels;
 using OsEngine.OsTrader.Panels.Tab;
+using OsEngine.OsTrader.Panels.Attributes;
 using OsEngine.Charts.CandleChart.Indicators;
 using OsEngine.Indicators;
 
 namespace OsEngine.Robots.OnScriptIndicators
 {
+    [Bot("BollingerTrend")]
     class BollingerTrend : BotPanel
     {
         #region // Публичные настроечные параметры робота
