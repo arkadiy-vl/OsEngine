@@ -32,6 +32,7 @@ namespace OsEngine.Robots.MyBot
             txbPositionsSpread.Text = _bot.PositionsSpread.ToString();
             txbMaxOrderDistance.Text = _bot.MaxOrderDistance.ToString();
             txbTradeTimePeriod.Text = _bot.TradeTimePeriod.ToString();
+            txbSlippage.Text = _bot.Slippage.ToString();
         }
 
         private void BtnAccept_Click(object sender, RoutedEventArgs e)
@@ -44,6 +45,7 @@ namespace OsEngine.Robots.MyBot
                 _bot.PositionsSpread = Convert.ToInt32(txbPositionsSpread.Text);
                 _bot.MaxOrderDistance = Convert.ToInt32(txbMaxOrderDistance.Text);
                 _bot.TradeTimePeriod = Convert.ToInt32(txbTradeTimePeriod.Text);
+                _bot.Slippage = Convert.ToInt32(txbSlippage.Text);
             }
             catch (Exception)
             {

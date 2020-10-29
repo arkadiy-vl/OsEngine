@@ -15,13 +15,20 @@ using System.Windows;
 namespace OsEngine.Robots.MyBot
 {
     /// <summary>
-    /// Робот для парного межбиржевого арбитража из курса OsEngine - Арбитраж
-    /// Торгует при изменении спреда
+    /// Робот для парного межбиржевого арбитража из курса OsEngine - Арбитраж (c моими небольшими изменениями)
+    /// Торгует при изменении спреда на тиках.
+    /// Тестировать надо, либо на тиковых данных, либо в режиме эмулятора на реальных подключениях к биржам.
+    /// Входы, выходы при пробитии спредом границ канала, построенного от SMA спреда c помощью индикатора IvashovRange.
+    /// Функция выбора каким инструментом входить первым, при этом первый инструмент входит лимитной заявкой,
+    /// а второй инструмент - рыночной заявкой.
+    /// Функция выбора направления сделок для каждого инструмента при пробитии верхней границы канала,
+    /// при этом при пробитии нижней границы направления сделок будет противоположным.
+    /// Объем входа в позицию для каждого инструмента задается в настройках.
     /// </summary>
     [Bot("PairArbitrage")]
     public class PairArbitrage : BotPanel
     {
-        #region Параметры робота
+        #region === Параметры робота ===
         // оптимизируемые параметры робота
         private StrategyParameterInt LenghtMA;                  // длина индикатора скользящая средняя MA
         private StrategyParameterInt LenghtIvashovMA;           // длина скользящей средней индикатора IvashovRange 
@@ -33,8 +40,8 @@ namespace OsEngine.Robots.MyBot
         public WhoIsFirst WhoIsFirst = WhoIsFirst.Nobody;       // каким инструментом входим вначале
         public decimal Volume1 = 1;                             // объем входа для инструмента 1
         public decimal Volume2 = 1;                             // объем входа для инструмента 2
-        public int Slippage1 = 0;                               // проскальзывание для инструмента 1
-        public int Slippage2 = 0;                               // проскальзывание для инструмента 2
+        public int Slippage1 = 100;                               // проскальзывание для инструмента 1
+        public int Slippage2 = 100;                               // проскальзывание для инструмента 2
         public Side Side1 = Side.Buy;                           // сторона входа для инструмента 1, когда индекс выше канала    
         public Side Side2 = Side.Sell;                          // сторона входа для инструмента 2, когда индекс выше канала
 
@@ -50,7 +57,7 @@ namespace OsEngine.Robots.MyBot
         IvashovRange _ivashov;
 
         // последнее значение индекса и индикаторов
-        decimal _lastIndexPrice;
+        decimal _lastIndex;
         decimal _lastMA;
         decimal _lastIvashov;
 
@@ -111,7 +118,7 @@ namespace OsEngine.Robots.MyBot
             DeleteEvent += Strategy_DeleteEvent;
         }
 
-        #region Сервисные методы
+        #region === Сервисные методы ===
         /// <summary>
         /// Сервисный метод, вызываемый при изменении оптимизируемых параметров робота
         /// </summary>
@@ -172,9 +179,9 @@ namespace OsEngine.Robots.MyBot
                     writer.Close();
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                MessageBox.Show("Не могу сохранить настройки робота");
+                MessageBox.Show($"Не могу сохранить настройки робота.\n {e.Message}");
 
             }
         }
@@ -205,9 +212,9 @@ namespace OsEngine.Robots.MyBot
                     reader.Close();
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                MessageBox.Show("Не могу загрузить настройки робота");
+                MessageBox.Show($"Не могу загрузить настройки робота.\n {e.Message}");
             }
         }
 
@@ -225,59 +232,47 @@ namespace OsEngine.Robots.MyBot
 
         #endregion
 
-        #region Основная торговая логика
+        #region === Основная торговая логика ===
         /// <summary>
         /// Обработчик изменения спреда
         /// </summary>
         /// <param name="candlesIndex">Свечи индекса</param>
         private void _tabIndex_SpreadChangeEvent(List<Candle> candlesIndex)
         {
-            // проверяем, что робот включен
-            if(IsOn == false)
+            // проверяем, что робот включен и вкладки для торговли инструментов подключены
+            if (IsOn == false || _tab1.IsConnected == false || _tab2.IsConnected == false)
             {
                 return;
             }
 
-            // проверяем, что вкладки для торговли инструментов подключены
-            if (_tab1.IsConnected == false || _tab2.IsConnected == false)
-            {
-                return;
-            }
-
-            // проверяем наличие свечей в индексе и вкладках для торговли
-            // и их достаточность для расчета индикаторов
-            List<Candle> candlesTab1 = _tab1.CandlesFinishedOnly;
-            List<Candle> candlesTab2 = _tab2.CandlesFinishedOnly;
-
+            // проверяем наличие свечей в индексе и их достаточность для расчета индикаторов
             if (candlesIndex == null ||
                 candlesIndex.Count < _ma.Lenght + 2 ||
-                candlesIndex.Count < _ivashov.LenghtMa + 2 ||
-                candlesIndex.Count < _ivashov.LenghtAverage + 2 ||
-                candlesTab1 == null || candlesTab1.Count < 1 ||
-                candlesTab2 == null || candlesTab2.Count < 1)
+                candlesIndex.Count < _ivashov.LenghtMa + 30 ||
+                candlesIndex.Count < _ivashov.LenghtAverage + 30)
             {
                 return;
             }
 
             // сохраняем последнее значение индекса и индикаторов (для упрощения кода)
-            _lastIndexPrice = candlesIndex[candlesIndex.Count - 1].Close;
+            _lastIndex = candlesIndex[candlesIndex.Count - 1].Close;
             _lastMA = _ma.Values[_ma.Values.Count - 1];
             _lastIvashov = _ivashov.Values[_ivashov.Values.Count - 1];
 
             // берем все открытые позиции в обоих вкладках для торговли
             List<Position> positionsTab1 = _tab1.PositionsOpenAll;
-            List<Position> positionsTab2 = _tab1.PositionsOpenAll;
+            List<Position> positionsTab2 = _tab2.PositionsOpenAll;
 
             // если есть хоть одна открытая позиция,
             // то проверяем условия закрытия позиций,
-            // иначе проверяем условия открытия позиций
             if (positionsTab1.Count != 0 || positionsTab2.Count != 0)
             {
-                LogicToClose(candlesIndex, positionsTab1, positionsTab2);
+                LogicToClose(positionsTab1, positionsTab2);
             }
+            // иначе проверяем условия открытия позиций
             else
             {
-                LogicToOpen(candlesIndex);
+                LogicToOpen();
             }
         }
 
@@ -285,10 +280,10 @@ namespace OsEngine.Robots.MyBot
         /// Логика открытия позиций
         /// </summary>
         /// <param name="candles">Свечи индекса</param>
-        private void LogicToOpen(List<Candle> candles)
+        private void LogicToOpen()
         {
-            // open high
-            if (_lastIndexPrice > _lastMA + _lastIvashov * Multiply.ValueDecimal)
+            // условие выхода индекса (спреда) за верхнюю границу канала
+            if (_lastIndex > _lastMA + _lastIvashov * Multiply.ValueDecimal)
             {
                 // проверяем, может ли инструмент 1 открываться первым
                 if (WhoIsFirst == WhoIsFirst.First || WhoIsFirst == WhoIsFirst.Nobody)
@@ -318,8 +313,8 @@ namespace OsEngine.Robots.MyBot
                     }
                 }
             }
-            // open low
-            else if (_lastIndexPrice < _lastMA - _lastIvashov * Multiply.ValueDecimal)
+            // условие выхода индекса (спреда) за нижнюю границу канала
+            else if (_lastIndex  < _lastMA - _lastIvashov * Multiply.ValueDecimal)
             {
                 // проверяем, может ли инструмент 1 открываться первым
                 if (WhoIsFirst == WhoIsFirst.First || WhoIsFirst == WhoIsFirst.Nobody)
@@ -357,19 +352,23 @@ namespace OsEngine.Robots.MyBot
         /// <param name="candles">Свечи индекса</param>
         /// <param name="positions1">Открытые позиции по инструменту 1</param>
         /// <param name="positions2">Открытые позиции по инструменту 2</param>
-        private void LogicToClose(List<Candle> candles, List<Position> positions1, List<Position> positions2)
+        private void LogicToClose(List<Position> positions1, List<Position> positions2)
         {
             // если позиции по инструментам не в состоянии Open, то ничего не делаем
+            // Проблема. Если по какой-то причине открылись только одной ногой, то при этом условии мы никогда не закроемся.
+            /*
             if (positions1.Count != 0 && positions1[0].State != PositionStateType.Open ||
                 positions2.Count != 0 && positions2[0].State != PositionStateType.Open)
             {
                 return;
             }
+            */
 
-            // закрытие позиций, которые открылись, когда индекс был ниже канала 
-            if (_lastIndexPrice > _lastMA + _lastIvashov * Multiply.ValueDecimal)
+            // закрытие позиций, которые открылись, когда индекс (спред) был ниже канала 
+            if (_lastIndex > _lastMA + _lastIvashov * Multiply.ValueDecimal)
             {
                 if (positions1.Count != 0 &&
+                    positions1[0].State == PositionStateType.Open &&
                     positions1[0].Direction != Side1)
                 {
                     if (positions1[0].Direction == Side.Buy)
@@ -385,7 +384,9 @@ namespace OsEngine.Robots.MyBot
                             positions1[0].OpenVolume);
                     }
                 }
+
                 if (positions2.Count != 0 &&
+                    positions2[0].State == PositionStateType.Open &&
                     positions2[0].Direction != Side2)
                 {
                     if (positions2[0].Direction == Side.Buy)
@@ -403,10 +404,11 @@ namespace OsEngine.Robots.MyBot
                 }
 
             }
-            // закрытие позиций, которые открылись, когда индекс был выше канала
-            else if (_lastIndexPrice < _lastMA - _lastIvashov * Multiply.ValueDecimal)
+            // закрытие позиций, которые открылись, когда индекс (спред) был выше канала
+            else if (_lastIndex < _lastMA - _lastIvashov * Multiply.ValueDecimal)
             {
                 if (positions1.Count != 0 &&
+                    positions1[0].State == PositionStateType.Open &&
                     positions1[0].Direction == Side1)
                 {
                     if (positions1[0].Direction == Side.Buy)
@@ -424,6 +426,7 @@ namespace OsEngine.Robots.MyBot
                 }
 
                 if (positions2.Count != 0 &&
+                    positions2[0].State == PositionStateType.Open &&
                     positions2[0].Direction == Side2)
                 {
                     if (positions2[0].Direction == Side.Buy)
@@ -453,6 +456,7 @@ namespace OsEngine.Robots.MyBot
             {
                 return;
             }
+
             // в зависимости от направления открытой позиции по инструменту 1
             // выставляем противоположную рыночную заявку по инструменту 2
             if (position1.Direction == Side.Sell)

@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OsEngine.Robots.MyBot"
         mc:Ignorable="d"
-        Title="PairArbitrageUi" Style="{StaticResource WindowStyleNoResize}"  ResizeMode ="CanResize" Height="367" Width="500">
+        Title="PairArbitrageUi" Style="{StaticResource WindowStyleNoResize}"  ResizeMode ="NoResize" Height="367" Width="500">
     <Grid>
         <CheckBox x:Name="chbIsOn" Content="IsOn" HorizontalAlignment="Left" Margin="203,22,0,0" VerticalAlignment="Top"/>
         <ComboBox x:Name="cmbWhoIsFirst" HorizontalAlignment="Left" Margin="170,59,0,0" VerticalAlignment="Top" Width="120"/>
@@ -24,7 +24,7 @@
         <Label Content="Security2" HorizontalAlignment="Left" Margin="356,127,0,0" VerticalAlignment="Top" RenderTransformOrigin="0,-0.304" Width="65"/>
         <ComboBox x:Name="cmbSide2" HorizontalAlignment="Left" Margin="356,164,0,0" VerticalAlignment="Top" Width="120"/>
         <Label Content="Side" HorizontalAlignment="Left" Margin="305,164,0,0" VerticalAlignment="Top" RenderTransformOrigin="0,-0.304"/>
-        <TextBox x:Name="txbVolume2" Text="111" HorizontalAlignment="Left" Margin="356,203,0,0" TextWrapping="Wrap"  VerticalAlignment="Top" Width="124" Foreground="White"/>
+        <TextBox x:Name="txbVolume2" Text="" HorizontalAlignment="Left" Margin="356,203,0,0" TextWrapping="Wrap"  VerticalAlignment="Top" Width="124" Foreground="White"/>
         <Label Content="Volume" HorizontalAlignment="Left" Margin="287,200,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.105,-0.13"/>
         <TextBox x:Name="txbSlippage2" Text="" HorizontalAlignment="Left" Margin="356,241,0,0" TextWrapping="Wrap"  VerticalAlignment="Top" Width="120" Foreground="White"/>
         <Label Content="Slippage" HorizontalAlignment="Left" Margin="280,241,0,0" VerticalAlignment="Top" RenderTransformOrigin="0.105,-0.13"/>

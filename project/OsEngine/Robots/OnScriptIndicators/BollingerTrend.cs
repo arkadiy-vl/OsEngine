@@ -11,6 +11,20 @@ using OsEngine.Indicators;
 
 namespace OsEngine.Robots.OnScriptIndicators
 {
+
+    // Трендовый робот по каналу болинжера с использованием реверсной системы входа/выхода.
+    // Проверка условий входа в позицию, выхода из позиции на завершении свечи.
+    // Сигнал входа в позицию - пробой канала болинжера.
+    // Сигнал выхода из позиции - либо пробой противоположной линии канала болинджера,
+    // либо пробой центра канала болинжера.
+    // По реверсной системе позицию открываем только после успешного закрытия предыдущей позиции.
+    // Если позиция не открылась с первого раза, то пытаемся повторно открыть позицию по лимиту,
+    // если позиция снова не открылась, то ничего не делаем.
+    // Если позиция не закрылась с первого раза, то пытаемся повторно закрыть позицию по лимиту,
+    // если позиция снова не закрылась, то закрываем её по маркету.
+    // Опция перевода позиции в безубыток при достижении мин. профита.
+    // Размер входа либо фиксированный размер, либо процент от депозита.
+
     [Bot("BollingerTrend")]
     class BollingerTrend : BotPanel
     {
@@ -40,15 +54,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         // отклонение индикатора Bollinger
         public StrategyParameterDecimal BollingerDeviation;
 
-        // разрешить фильтр входа в позицию по индикатору ADX
-        public StrategyParameterBool OnFilterAdx;
-
-        // длина индикатора ADX
-        public StrategyParameterInt AdxPeriod;
-
-        // уровень индикатора ADX, определяющий наличие тренда 
-        public StrategyParameterInt AdxLevel;
-
         // способ выхода из позиции: по противоположной границе канала, по центру канала
         public StrategyParameterString MethodOutOfPosition;
 
@@ -76,7 +81,7 @@ namespace OsEngine.Robots.OnScriptIndicators
 
         // индикаторы для робота
         private Aindicator bollinger;
-        private Aindicator adx;
+        //private Aindicator adx;
 
         // последняя цена
         private decimal lastPrice;
@@ -88,7 +93,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         // последний верхний, нижний болинджер и ADX
         private decimal upBollinger;
         private decimal downBollinger;
-        private decimal lastAdx;
 
         // последний стакан
         private MarketDepth lastMarketDepth;
@@ -98,9 +102,6 @@ namespace OsEngine.Robots.OnScriptIndicators
 
         // время актуальности стакана в секундах
         private readonly int marketDepthRelevanceTime = 5;
-
-        // дополнительные фильтр ADX (сила тренда) на вход в позицию
-        private bool filterAdx = false;
 
         // итоговый фильтр на вход в позицию лонг/шорт
         private bool filterInLong = false;
@@ -137,9 +138,6 @@ namespace OsEngine.Robots.OnScriptIndicators
             VolumePercent = CreateParameter("Объем входа в позицию (%)", 50, 40, 300, 10);
             BollingerPeriod = CreateParameter("Длина болинжера", 100, 50, 200, 10);
             BollingerDeviation = CreateParameter("Отклонение болинжера", 1.5m, 1.0m, 3.0m, 0.2m);
-            OnFilterAdx = CreateParameter("Включить фильтр входа в позицию по ADX", false);
-            AdxPeriod = CreateParameter("Длина ADX", 10, 5, 35, 5);
-            AdxLevel = CreateParameter("Уровень тренда индикатора ADX", 24, 14, 30, 2);
             MethodOutOfPosition = CreateParameter("Метод выхода из позиции", "ChannelBoundary", new[] { "ChannelBoundary", "ChannelCenter" });
             OnStopForBreakeven = CreateParameter("Вкл. стоп для перевода в безубытк", true);
             MinProfitOnStopBreakeven = CreateParameter("Мин. профит для перевода в безубытк (%)", 7, 5, 20, 1);
@@ -153,11 +151,6 @@ namespace OsEngine.Robots.OnScriptIndicators
             bollinger.ParametersDigit[0].Value = BollingerPeriod.ValueInt;
             bollinger.ParametersDigit[1].Value = BollingerDeviation.ValueDecimal;
             bollinger.Save();
-
-            adx = IndicatorsFactory.CreateIndicatorByName("ADX", name + "ADX", false);
-            adx = (Aindicator)tab.CreateCandleIndicator(adx, "Second");
-            adx.ParametersDigit[0].Value = AdxPeriod.ValueInt;
-            adx.Save();
 
             // подписываемся на события
             tab.CandleFinishedEvent += Tab_CandleFinishedEvent;
@@ -197,12 +190,6 @@ namespace OsEngine.Robots.OnScriptIndicators
                 bollinger.ParametersDigit[1].Value = BollingerDeviation.ValueDecimal;
                 bollinger.Reload();
             }
-
-            if (adx.ParametersDigit[0].Value != AdxPeriod.ValueInt)
-            {
-                adx.ParametersDigit[0].Value = AdxPeriod.ValueInt;
-                adx.Reload();
-            }
         }
 
         /// <summary>
@@ -216,14 +203,12 @@ namespace OsEngine.Robots.OnScriptIndicators
                 return;
             }
 
-            // сохраняем длину болинджера и ADX для сокращения объема кода
+            // сохраняем длину болинджера
             int bollingerPeriod = (int)bollinger.ParametersDigit[0].Value;
-            int adxPeriod = (int)adx.ParametersDigit[0].Value;
 
-            // проверка на достаточное количество свечек и наличие данных в болинджере и ADX
+            // проверка на достаточное количество свечек и наличие данных в болинджере
             if (candles == null || candles.Count < bollingerPeriod + 5 ||
-                bollinger.DataSeries[0].Values == null || bollinger.DataSeries[1].Values == null ||
-                candles.Count < adxPeriod + 5 || adx.DataSeries[0].Values == null)
+                bollinger.DataSeries[0].Values == null || bollinger.DataSeries[1].Values == null)
             {
                 return;
             }
@@ -234,23 +219,19 @@ namespace OsEngine.Robots.OnScriptIndicators
             lowLastCandle = candles[candles.Count - 1].Low;
             upBollinger = bollinger.DataSeries[0].Values[bollinger.DataSeries[0].Values.Count - 1];
             downBollinger = bollinger.DataSeries[1].Values[bollinger.DataSeries[1].Values.Count - 1];
-            lastAdx = adx.DataSeries[0].Values[adx.DataSeries[0].Values.Count - 1];
 
             // проверка на корректность последних значений цены и болинджера
-            if (lastPrice <= 0 || upBollinger <= 0 || downBollinger <= 0 || lastAdx <= 0)
+            if (lastPrice <= 0 || upBollinger <= 0 || downBollinger <= 0)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage("Отладка. Сработало условие - цена или линии болинждера или ADX" +
-                        " меньше или равны нулю.", Logging.LogMessageType.User);
+                tab.SetNewLogMessage("Tab_CandleFinishedEvent: цена или линии болинждера" +
+                        " меньше или равны нулю.", Logging.LogMessageType.Error);
                 return;
             }
 
             // вычисляем дополнительные фильтры на вход в позицию
-            filterAdx = (!OnFilterAdx.ValueBool ||
-                (OnFilterAdx.ValueBool && lastAdx > AdxLevel.ValueInt));
-
-            filterInLong = filterAdx;
-            filterInShort = filterAdx;
+            // сейчас фильтры не используются
+            filterInLong = true;
+            filterInShort = true;
 
             // берем все открытые позиции, которые дальше будем проверять на условие закрытия
             List<Position> openPositions = tab.PositionsOpenAll;
@@ -266,8 +247,15 @@ namespace OsEngine.Robots.OnScriptIndicators
                     }
 
                     // выхода из позиции по пробою индикатора Болинжер
-                    OutOfPositionByBollinger(openPositions[i]);
-
+                    if (MethodOutOfPosition.ValueString == "ChannelCenter")
+                    {
+                        OutOfPositionByCenterChannel(openPositions[i]);
+                    }
+                    else
+                    {
+                        OutOfPositionByBollinger(openPositions[i]);
+                    }
+                    
                     // установка стопа для перевода позиции в безубыток
                     if (OnStopForBreakeven.ValueBool)
                     {
@@ -285,16 +273,15 @@ namespace OsEngine.Robots.OnScriptIndicators
             // проверка возможности открытия позиции (робот открывает только одну позицию)
             if (openPositions.Count == 0)
             {
-                // условие входа в лонг:
-                // пробитие ценой верхнего болинджера и с учетом фильтра
+                // условие входа в лонг: пробитие ценой верхнего болинджера и с учетом фильтра
                 if (lastPrice > upBollinger &&
                     candles[candles.Count - 2].Close < bollinger.DataSeries[0].Values[bollinger.DataSeries[0].Values.Count - 2] &&
                     filterInLong && Regime.ValueString != "OnlyShort")
                 {
                     OpenLong();
                 }
-                // условие входа в шорт:
-                // пробитие ценой нижнего болинджера и с учетом фильтра
+
+                // условие входа в шорт: пробитие ценой нижнего болинджера и с учетом фильтра
                 else if (lastPrice < downBollinger &&
                     candles[candles.Count - 2].Close > bollinger.DataSeries[1].Values[bollinger.DataSeries[1].Values.Count - 2] &&
                     filterInShort && Regime.ValueString != "OnlyLong")
@@ -312,23 +299,20 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="position">позиция, которая не закрылась</param>
         private void Tab_PositionClosingFailEvent(Position position)
         {
-            // если у позиция еще не полностью закрылась и у неё остались ордера на закрытие, то закрываем их
+            // если позиция еще не полностью закрылась и у неё остались ордера на закрытие, то закрываем их
             if (position.CloseActiv)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в ClosingFailEvent: у позиции остались активные ордера. Закрываем их.", Logging.LogMessageType.User);
-
                 tab.CloseAllOrderToPosition(position);
-                System.Threading.Thread.Sleep(2000);
+                tab.SetNewLogMessage($"Tab_PositionClosingFailEvent: у позиции остались активные ордера. Закрываем их.", Logging.LogMessageType.User);
+                System.Threading.Thread.Sleep(4000);
             }
 
             // не закрытую со второго раза позицию закрываем по маркету
             if (position.SignalTypeClose == "reclosing")
             {
                 tab.CloseAtMarket(position, position.OpenVolume);
-
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Закрытие позиции {position.Number} с третьего раза по маркету:  объем - {position.OpenVolume}.", Logging.LogMessageType.User);
+                tab.SetNewLogMessage($"Tab_PositionClosingFailEvent: закрытие позиции {position.Number}" +
+                                         " по маркету:  объем - {position.OpenVolume}.", Logging.LogMessageType.User);
 
                 return;
             }
@@ -336,7 +320,8 @@ namespace OsEngine.Robots.OnScriptIndicators
             else
             {
                 if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Повторная попытка закрыть позицию {position.Number} по лимиту.", Logging.LogMessageType.User);
+                    tab.SetNewLogMessage($"Отладка. Tab_PositionClosingFailEvent: повторная попытка закрыть позицию {position.Number}" +
+                                         " по лимиту.", Logging.LogMessageType.User);
 
                 position.SignalTypeClose = "reclosing";
                 if (position.Direction == Side.Buy)
@@ -354,13 +339,14 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="position">Успешно закрытая позиция</param>
         private void Tab_PositionClosingSuccesEvent(Position position)
         {
-            // проверяем, что нет открытых или открывающихся позиций
+            // после успешного закрытия позиции проверяем, что нет открытых или открывающихся позиций
+            // и только после этого открываем противополжную позицию по реверсной системе
+            
             if (tab.PositionsOpenAll.Find(pos => pos.State == PositionStateType.Open ||
             pos.State == PositionStateType.Opening) != null)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в ClosingSuccesEvent: Есть открытые или открывающие позиции, поэтому не открываем позицю по реверсной системе", Logging.LogMessageType.User);
-
+                tab.SetNewLogMessage($"Tab_PositionClosingSuccesEvent: есть открытые или открывающие позиции," +
+                                         " поэтому не открываем позицю по реверсной системе", Logging.LogMessageType.Error);
                 return;
             }
 
@@ -386,17 +372,15 @@ namespace OsEngine.Robots.OnScriptIndicators
             // если у позиции остались какие-то ордера, то закрываем их
             if (position.OpenActiv)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в OpeningFailEvent: у позиции остались активные ордера. Закрываем их.", Logging.LogMessageType.User);
-
                 tab.CloseAllOrderToPosition(position);
-                System.Threading.Thread.Sleep(2000);
+                tab.SetNewLogMessage($"Tab_PositionOpeningFailEvent: у позиции остались активные ордера, закрываем их.", Logging.LogMessageType.User);
+                System.Threading.Thread.Sleep(4000);
             }
 
             if (position.SignalTypeOpen == "reopening")
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Повторное открытие позиции {position.Number} не удалось. Прекращаем пытаться открыть позицию.", Logging.LogMessageType.User);
+                tab.SetNewLogMessage($"Tab_PositionOpeningFailEvent: повторное открытие позиции {position.Number}" +
+                                         " не удалось. Прекращаем пытаться открыть позицию.", Logging.LogMessageType.Error);
 
                 signalInLong = signalInShort = false;
                 return;
@@ -404,7 +388,8 @@ namespace OsEngine.Robots.OnScriptIndicators
             else
             {
                 if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Повторная попытка открыть позицию {position.Number} по лимиту.", Logging.LogMessageType.User);
+                    tab.SetNewLogMessage($"Отладка. Tab_PositionOpeningFailEvent: повторная попытка открыть позицию {position.Number}" +
+                                         " по лимиту.", Logging.LogMessageType.User);
 
                 position.SignalTypeOpen = "reopening";
 
@@ -418,7 +403,8 @@ namespace OsEngine.Robots.OnScriptIndicators
         }
 
         /// <summary>
-        /// Обработка события изменения стакана
+        /// Обработка события изменения стакана.
+        /// Просто сохраняем в роботе последний полученный стакан.
         /// </summary>
         /// <param name="marketDepth">Полученный стакан</param>
         private void Tab_MarketDepthUpdateEvent(MarketDepth marketDepth)
@@ -429,8 +415,8 @@ namespace OsEngine.Robots.OnScriptIndicators
             }
 
             // проверка корректности полученного стакана
-            if (marketDepth.Asks != null && marketDepth.Asks.Count != 0 &&
-                marketDepth.Bids != null && marketDepth.Bids.Count != 0)
+            if (marketDepth.Asks.Count != 0 &&
+                marketDepth.Bids.Count != 0)
             {
                 // просто сохраняем в роботе полученный стакан, чтобы он всегда был актуальный
                 lastMarketDepth = marketDepth;
@@ -445,7 +431,7 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <param name="position">Позиция, которая проверяется на условия выхода</param>
         private void OutOfPositionByBollinger(Position position)
         {
-            // основное условие закрытия лонга (пробитие ценой противоположного болинджера)
+            // условие закрытия лонга - пробитие ценой противоположного болинджера
             if (position.Direction == Side.Buy && lastPrice < downBollinger)
             {
                 CloseLong(position);
@@ -458,7 +444,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                     signalInShort = true;
                 }
             }
-            // основное условие закрытия шорта (пробитие ценой противоположного болинджера)
+            // условие закрытия шорта - пробитие ценой противоположного болинджера
             else if (position.Direction == Side.Sell && lastPrice > upBollinger)
             {
                 CloseShort(position);
@@ -470,6 +456,29 @@ namespace OsEngine.Robots.OnScriptIndicators
                 {
                     signalInLong = true;
                 }
+            }
+
+            return;
+        }
+
+        /// <summary>
+        /// Метод выхода из позиции по пробою центра канала
+        /// </summary>
+        /// <param name="position">Позиция, которая проверяется на условия выхода</param>
+        private void OutOfPositionByCenterChannel(Position position)
+        {
+            // последнее значение центра канала
+            decimal lastCenterChannel = downBollinger + (upBollinger - downBollinger)/2;
+
+            // условие закрытия лонга - пробитие ценой центра канала
+            if (position.Direction == Side.Buy && lastPrice < lastCenterChannel)
+            {
+                CloseLong(position);
+            }
+            // условие закрытия шорта - пробитие ценой центра канала
+            else if (position.Direction == Side.Sell && lastPrice > lastCenterChannel)
+            {
+                CloseShort(position);
             }
 
             return;
@@ -540,8 +549,7 @@ namespace OsEngine.Robots.OnScriptIndicators
                 // установка фиксированного стопа для позиции лонг
                 if (position.Direction == Side.Buy)
                 {
-                    // вычисление цены активации
-                    // цена активации устанавливается на 10 проскальзывания выше цены открытия позиции
+                    // цена активации устанавливается на 10 проскальзываний выше цены открытия позиции
                     priceActivation = position.EntryPrice + 10 * Slippage.ValueInt * tab.Securiti.PriceStep;
 
                     // если цена активации получилась больше или равна последней цене, то ничего не делаем
@@ -566,7 +574,6 @@ namespace OsEngine.Robots.OnScriptIndicators
                 // установка фиксированного стопа для позиции шорт
                 else if (position.Direction == Side.Sell)
                 {
-                    // вычисление цены активации
                     // цена активации устанавливается на 10 проскальзывания ниже цены открытия позиции
                     priceActivation = position.EntryPrice - 10 * Slippage.ValueInt * tab.Securiti.PriceStep;
 
@@ -600,7 +607,6 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <returns>Позиция, которая будет открыта</returns>
         private Position OpenLong(Position position = null)
         {
-
             // Определяем объем и цену входа в позицию лонг
             decimal volumePosition = GetVolumePosition(tab.PriceBestAsk, DepositNameCode.ValueString);
             decimal pricePosition = GetPriceBuy(volumePosition);
@@ -608,8 +614,18 @@ namespace OsEngine.Robots.OnScriptIndicators
             // Если объем входа в позицию посчитался не корректно, то не покупаем
             if (volumePosition <= 0)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в OpenLong:  некорректный объем - {volumePosition}. Покупка не возможна.", Logging.LogMessageType.User);
+                tab.SetNewLogMessage($"OpenLong:  некорректный объем - {volumePosition}. Покупка не возможна.", Logging.LogMessageType.Error);
+
+                // сброс сигнала входа в лонг по реверсной системе
+                signalInLong = false;
+
+                return null;
+            }
+
+            // если цена входа в позицию посчиталась не корректно, то не покупаем
+            if (pricePosition <= 0)
+            {
+                tab.SetNewLogMessage($"OpenLong:  некорректная цена - {pricePosition}. Покупка не возможна.", Logging.LogMessageType.Error);
 
                 // сброс сигнала входа в лонг по реверсной системе
                 signalInLong = false;
@@ -617,47 +633,25 @@ namespace OsEngine.Robots.OnScriptIndicators
                 return null;
             }
             
-            // если объем и цена позиции посчитались корректно, то покупаем по лимиту
-            if (volumePosition > 0 && pricePosition > 0)
+            // покупаем по лимиту
+            // к цене входа в позицию добавляем проскальзывание (покупаем дороже)
+            decimal pricePositionWithSlippage = pricePosition + Slippage.ValueInt * tab.Securiti.PriceStep;
+
+            if(position == null)
             {
-                // к цене входа в позицию добавляем проскальзывание (покупаем дороже)
-                decimal pricePositionWithSlippage = pricePosition + Slippage.ValueInt * tab.Securiti.PriceStep;
+                // вход в позицию лонг по лимиту
+                position = tab.BuyAtLimit(volumePosition, pricePositionWithSlippage);
 
-                if(position == null)
-                {
-                    // вход в позицию лонг по лимиту
-                    position = tab.BuyAtLimit(volumePosition, pricePositionWithSlippage);
-
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Открытие лонга по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
-                }
-                else
-                {
-                    // повторный вход в позицию лонг по лимиту
-                    tab.BuyAtLimitToPosition(position, pricePositionWithSlippage, volumePosition);
-
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Повторное открытие лонга {position.Number} по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
-                }
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Открытие лонга по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
             }
-            // иначе покупаем по маркету
             else
             {
-                if(position == null)
-                {
-                    // вход в позицию лонг по маркету
-                    position = tab.BuyAtMarket(volumePosition);
+                // повторный вход в позицию лонг по лимиту
+                tab.BuyAtLimitToPosition(position, pricePositionWithSlippage, volumePosition);
 
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Открытие лонга по маркету:  объем - {volumePosition}.", Logging.LogMessageType.User);
-                }
-                else
-                {
-                    tab.BuyAtMarketToPosition(position, volumePosition);
-
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Повторное открытие лонга {position.Number} по маркету:  объем - {volumePosition}.", Logging.LogMessageType.User);
-                }
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Повторное открытие лонга {position.Number} по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
             }
 
             // сброс флага входа в лонг по реверсной системе
@@ -671,65 +665,53 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// </summary>
         /// <returns>Позиция, которая будет открыта</returns>
         private Position OpenShort(Position position = null)
+
         {
             // определяем объем и цену входа в позицию шорт
             decimal volumePosition = GetVolumePosition(tab.PriceBestBid, DepositNameCode.ValueString);
             decimal pricePosition = GetPriceSell(volumePosition);
 
-            // Если объем входа в позицию посчитался не корректно, то не продаем
+            // если объем входа в позицию посчитался не корректно, то не продаем
             if (volumePosition <= 0)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в OpenShort:  некорректный объем - {volumePosition}. Продажа не возможна.", Logging.LogMessageType.User);
+                tab.SetNewLogMessage($"OpenShort:  некорректный объем - {volumePosition}. Продажа не возможна.", Logging.LogMessageType.Error);
 
-                // сброс сигнала входа в лонг по реверсной системе
+                // сброс сигнала входа в шорт по реверсной системе
                 signalInShort = false;
 
                 return null;
             }
 
-            // если объем и цена позиции посчитались корректно, то продаем по лимиту
-            if (volumePosition > 0 && pricePosition > 0)
+            // если цена входа в позицию посчиталась не корректно, то не продаем
+            if (pricePosition <= 0)
             {
-                // из цены вход в позицию вычитаем проскальзывание (продаем дешевле)
-                decimal pricePositionWithSlippage = pricePosition - Slippage.ValueInt * tab.Securiti.PriceStep;
+                tab.SetNewLogMessage($"OpenShort:  некорректная цена - {pricePosition}. Продажа не возможна.", Logging.LogMessageType.User);
 
-                if(position == null)
-                {
-                    // вход в позицию шорт по лимиту
-                    position = tab.SellAtLimit(volumePosition, pricePositionWithSlippage);
+                // сброс сигнала входа в шорт по реверсной системе
+                signalInShort = false;
 
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Открытие шорта по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
-                }
-                else
-                {
-                    // повторный вход в позицию шорт по лимиту
-                    tab.SellAtLimitToPosition(position, pricePositionWithSlippage, volumePosition);
-
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Повторное открытие шорта {position.Number} по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
-                }
+                return null;
             }
-            // иначе продаем по маркету
+
+            // продаем по лимиту
+            // из цены вход в позицию вычитаем проскальзывание (продаем дешевле)
+            decimal pricePositionWithSlippage = pricePosition - Slippage.ValueInt * tab.Securiti.PriceStep;
+
+            if(position == null)
+            {
+                // вход в позицию шорт по лимиту
+                position = tab.SellAtLimit(volumePosition, pricePositionWithSlippage);
+
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Открытие шорта по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
+            }
             else
             {
-                if(position == null)
-                {
-                    // вход в позицию шорт по маркету
-                    position = tab.SellAtMarket(volumePosition);
+                // повторный вход в позицию шорт по лимиту
+                tab.SellAtLimitToPosition(position, pricePositionWithSlippage, volumePosition);
 
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Открытие шорта по маркету:  объем - {volumePosition}.", Logging.LogMessageType.User);
-                }
-                else
-                {
-                    // повторный вход в позицию шорт по маркету
-                    tab.SellAtMarketToPosition(position, volumePosition);
-
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Повторное открытие шорта {position.Number} по маркету:  объем - {volumePosition}.", Logging.LogMessageType.User);
-                }
+                if (OnDebug.ValueBool)
+                    tab.SetNewLogMessage($"Отладка. Повторное открытие шорта {position.Number} по лимиту:  объем - {volumePosition}, цена - {pricePosition}, цена с проск. - {pricePositionWithSlippage}.", Logging.LogMessageType.User);
             }
 
             // сброс флага входа в шорт по реверсной системе
@@ -764,9 +746,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             else
             {
                 tab.CloseAtMarket(position, volumePosition);
-
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Закрытие лонга по маркету: объем - {volumePosition}.", Logging.LogMessageType.User);
+                tab.SetNewLogMessage($"CloseLong: Некорректная цена выхода. Закрытие лонга по маркету: объем - {volumePosition}.", Logging.LogMessageType.Error);
             }
 
             return;
@@ -798,9 +778,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             else
             {
                 tab.CloseAtMarket(position, volumePosition);
-
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Закрытие шорта по маркету: объем - {volumePosition}.", Logging.LogMessageType.User);
+                tab.SetNewLogMessage($"CloseShort: Некорректная цена выхода. Закрытие шорта по маркету: объем - {volumePosition}.", Logging.LogMessageType.Error);
             }
 
             return;
@@ -817,9 +795,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             // проверка на корректность переданной цены инструмента
             if (price <= 0)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в GetVolumePosition: некорректное значение переданной цены.", Logging.LogMessageType.User);
-
+                tab.SetNewLogMessage($"GetVolumePosition: некорректное значение переданной цены.", Logging.LogMessageType.Error);
                 return 0.0m;
             }
 
@@ -850,9 +826,7 @@ namespace OsEngine.Robots.OnScriptIndicators
             // проверка на корректность полученного размера депозита
             if (depositValue <= 0)
             {
-                if (OnDebug.ValueBool)
-                    tab.SetNewLogMessage($"Отладка. Сработало условие в GetVolumePosition: некорректное значение полученного размера депозита.", Logging.LogMessageType.User);
-
+                tab.SetNewLogMessage($"GetVolumePosition: некорректное значение полученного размера депозита.", Logging.LogMessageType.Error);
                 return 0.0m;
             }
 
@@ -870,37 +844,38 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <returns>Цена входа в позицию</returns>
         private decimal GetPriceBuy(decimal volume)
         {
-            // если робот запущен в терминале, то находим цену покупки из стакана
-            if (startProgram.ToString() == "IsOsTrader")
+            // если робот запущен не в терминале, то берем последнюю цену
+            if (startProgram.ToString() != "IsOsTrader")
+            {
+                return lastPrice;
+            }
+            // иначе робот запущен в терминале, тогда берем цену из стакана
+            else
             {
                 // цена покупки
                 decimal priceBuy = 0.0m;
 
-                // резерв по уровням стакана,
+                // запас по уровням стакана,
                 // т.е. насколько уровней выше, чем посчитали, берем цену из станкана
                 int reservLevelAsks = 1;
 
                 // максимально отклонение полученной из стакана цены покупки от лучшего Ask в стакане(в процентах)
-                int maxPriceDeviation = 5;
+                int maxPriceDeviation = 3;
 
                 // проверка на корректность переданного объема
                 if (volume <= 0)
                 {
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceBuy: некорректный объем.", Logging.LogMessageType.User);
-
+                    tab.SetNewLogMessage($"GetPriceBuy: некорректный объем - {volume}.", Logging.LogMessageType.Error);
                     return 0.0m;
                 }
 
                 // проверка на наличие и актуальность стакана
                 if (lastMarketDepth.Asks == null ||
-                    lastMarketDepth.Asks.Count < 2 ||
+                    lastMarketDepth.Asks.Count < 5 ||
                     lastMarketDepth.Time.AddHours(ShiftTimeExchange.ValueInt).AddSeconds(marketDepthRelevanceTime) < DateTime.Now)
                 {
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceBuy: некорректный или неактуальный стакан.", Logging.LogMessageType.User);
-
-                    return 0.0m;
+                    tab.SetNewLogMessage($"GetPriceBuy: некорректный или неактуальный стакан.", Logging.LogMessageType.Error);
+                    return tab.PriceBestAsk;
                 }
 
                 // обходим Asks в стакане на глубину анализа стакана
@@ -914,20 +889,14 @@ namespace OsEngine.Robots.OnScriptIndicators
                         break;
                     }
                 }
+
                 if (priceBuy > (1.0m + maxPriceDeviation / 100.0m) * lastMarketDepth.Asks[0].Price)
                 {
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceBuy: цена входа в позицию выше допустимого отклонения от лучшего Ask в стакане.", Logging.LogMessageType.User);
-
+                    tab.SetNewLogMessage($"GetPriceBuy: цена входа в позицию выше допустимого отклонения от лучшего Ask в стакане.", Logging.LogMessageType.Error);
                     return 0.0m;
                 }
 
                 return priceBuy;
-            }
-            // иначе робот запущен в тестере или оптимизаторе, тогда берем последнюю цену
-            else
-            {
-                return lastPrice;
             }
         }
 
@@ -938,37 +907,38 @@ namespace OsEngine.Robots.OnScriptIndicators
         /// <returns></returns>
         private decimal GetPriceSell(decimal volume)
         {
+            // если робот запущен не в терминале, тогда берем последнюю цену
+            if (startProgram.ToString() != "IsOsTrader")
+            {
+                return lastPrice;
+            }
             // если робот запущен в терминале, то находим цену продажи из стакана
-            if (startProgram.ToString() == "IsOsTrader")
+            else
             {
                 // цена продажи
                 decimal priceSell = 0.0m;
 
-                // резерв по уровням стакана,
+                // запас по уровням стакана,
                 // т.е. насколько уровней выше, чем посчитали, берем цену из стакана
                 int reservLevelBids = 1;
 
-                // максимально отклонение полученной из стакана цены продажи от лучшего Bid в стакане(в процентах)
-                int maxPriceDeviation = 5;
+                // максимальное отклонение полученной из стакана цены продажи от лучшего Bid в стакане (в процентах)
+                int maxPriceDeviation = 3;
 
                 // проверка на корректность переданного объема
                 if (volume <= 0)
                 {
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceSell: некорректный объем.", Logging.LogMessageType.User);
-
+                    tab.SetNewLogMessage($"GetPriceSell: некорректный объем {volume}.", Logging.LogMessageType.Error);
                     return 0.0m;
                 }
 
                 // проверка на наличие и актуальность стакана
                 if (lastMarketDepth.Bids == null || 
-                    lastMarketDepth.Bids.Count < 2 ||
+                    lastMarketDepth.Bids.Count < 5 ||
                     lastMarketDepth.Time.AddHours(ShiftTimeExchange.ValueInt).AddSeconds(marketDepthRelevanceTime) < DateTime.Now)
                 {
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceSell: некорректный или неактуальный стакан.", Logging.LogMessageType.User);
-
-                    return 0.0m;
+                    tab.SetNewLogMessage($"GetPriceSell: некорректный или неактуальный стакан.", Logging.LogMessageType.Error);
+                    return tab.PriceBestBid;
                 }
 
                 // обходим Bids в стакане на глубину анализа стакана
@@ -982,20 +952,14 @@ namespace OsEngine.Robots.OnScriptIndicators
                         break;
                     }
                 }
+
                 if (priceSell < (1.0m - maxPriceDeviation / 100.0m) * lastMarketDepth.Bids[0].Price)
                 {
-                    if (OnDebug.ValueBool)
-                        tab.SetNewLogMessage($"Отладка. Сработало условие в GetPriceSell: цена входа в позицию ниже допустимого отклонения от лучшего Bid в стакане.", Logging.LogMessageType.User);
-
+                    tab.SetNewLogMessage($"GetPriceSell: цена входа в позицию ниже допустимого отклонения от лучшего Bid в стакане.", Logging.LogMessageType.Error);
                     return 0.0m;
                 }
 
                 return priceSell;
-            }
-            // иначе робот запущен в тестере или оптимизаторе, тогда берем последнюю цену
-            else
-            {
-                return lastPrice;
             }
         }
 

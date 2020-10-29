@@ -16,8 +16,13 @@ using System.Windows;
 namespace OsEngine.Robots.MyBot
 {
     /// <summary>
-    /// Робот для одноного арбитража относительно индекса из курса OsEngine - Арбитраж
-    /// В данном роботе надо отключать сопровождение позиции
+    /// Робот для одноногого арбитража относительно индекса из курса OsEngine - Арбитраж (c моими небольшими изменениями)
+    /// Робот торгует через заданные интервалы времени (10 сек), поэтому тестировать надо на тиковых данных
+    /// В данном роботе надо отключать сопровождение позиции, а в тестере надо выставлять большие значения на время отзыва ордеров.
+    /// Входы, выходы при выходе спреда за границы канала, построенного от SMA спреда с помощью индикатора IvashovRange.
+    /// Робот выставляет сетку ордеров в соответствии с настройками
+    /// Если ордер не исполнился и цена ушла от него, то ордер снимается.
+    /// 
     /// </summary>
     [Bot("OneLegArbitrageGrid")]
     public class OneLegArbitrageGrid : BotPanel
@@ -36,6 +41,7 @@ namespace OsEngine.Robots.MyBot
         public int PositionsSpread = 10;                         // спред между открываемыми позициями
         public int MaxOrderDistance = 110;                      // максимальное расстояние от края стакана
         public int TradeTimePeriod = 10;                        // временной период торговли робота в секундах
+        public int Slippage = 10;                               // проскальзывание, используется только при закрытии позиций
 
         // последнее значение времени торговли робота
         DateTime _lastTradeTime = DateTime.Now.AddYears(-10);
@@ -139,6 +145,7 @@ namespace OsEngine.Robots.MyBot
                     writer.WriteLine(PositionsSpread);
                     writer.WriteLine(MaxOrderDistance);
                     writer.WriteLine(TradeTimePeriod);
+                    writer.WriteLine(Slippage);
 
                     writer.Close();
                 }
@@ -169,6 +176,7 @@ namespace OsEngine.Robots.MyBot
                     PositionsSpread = Convert.ToInt32(reader.ReadLine());
                     MaxOrderDistance = Convert.ToInt32(reader.ReadLine());
                     TradeTimePeriod = Convert.ToInt32(reader.ReadLine());
+                    Slippage = Convert.ToInt32(reader.ReadLine());
 
                     reader.Close();
                 }
@@ -214,14 +222,15 @@ namespace OsEngine.Robots.MyBot
         #region Основная торговая логика
         private void _tab_ServerTimeChangeEvent(DateTime time)
         {
-            // проверяем, что робот включен
-            if (IsOn == false)
+            // запускаем торговую логику только через периоды времени _tradeTimePeriod 
+            if (_lastTradeTime.AddSeconds(TradeTimePeriod) > time)
             {
                 return;
             }
+            _lastTradeTime = time;
 
-            // проверяем, что вкладка индекса и вкладка для торговли подключены
-            if (_tabIndex.IsConnected == false || _tab.IsConnected == false)
+            // проверяем, что робот включен, вкладка индекса и вкладка для торговли подключены
+            if (IsOn == false || _tabIndex.IsConnected == false || _tab.IsConnected == false)
             {
                 return;
             }
@@ -229,23 +238,17 @@ namespace OsEngine.Robots.MyBot
             // проверяем наличие свечей в индексе и вкладке для торговли
             // и их достаточность для расчета индикаторов
             List<Candle> candlesIndex = _tabIndex.Candles;
-            List<Candle> candlesTab = _tab.CandlesFinishedOnly;
+            //List<Candle> candlesTab = _tab.CandlesFinishedOnly;
 
             if (candlesIndex == null ||
+
                 candlesIndex.Count < _ma.Lenght + 2 ||
                 candlesIndex.Count < _ivashov.LenghtMa + 30 ||
-                candlesIndex.Count < _ivashov.LenghtAverage + 30 ||
-                candlesTab == null || candlesTab.Count < 1)
+                candlesIndex.Count < _ivashov.LenghtAverage + 30 /*||
+                candlesTab == null || candlesTab.Count < 1*/)
             {
                 return;
             }
-
-            // запускаем торговую логику только через периоды времени _tradeTimePeriod 
-            if (_lastTradeTime.AddSeconds(TradeTimePeriod) > time)
-            {
-                return;
-            }
-            _lastTradeTime = time;
 
             // сохраняем последнее значение индекса и индикаторов (для упрощения кода)
             _lastIndexPrice = candlesIndex[candlesIndex.Count - 1].Close;
@@ -271,19 +274,23 @@ namespace OsEngine.Robots.MyBot
             }
 
             CheckDistanceToOrder();
-
         }
 
         private void TryOpenShortPositions()
         {
+            // получаем все открытые или открывающиеся позиции
             List<Position> positions = _tab.PositionsOpenAll;
-
             int curPosCount = positions.Count;
+            
+            // цена, от которой будем выставлять сетку ордеров
+            // сетка ордеров на продажу выставляется выше этой цены
             decimal curPricePosition = _tab.PriceBestAsk;
 
+            // выставление сетки ордеров лимитными заявками
             for(int i = 0; i < MaxPositionsCount - curPosCount; i++)
             {
-                if(positions.Find(pos=>pos.EntryPrice == curPricePosition) != null)
+                // если уже есть позиция с такой же ценой открытия, то не выставляем ордер
+                if (positions.Find(pos=>pos.EntryPrice == curPricePosition) != null)
                 {
                     curPricePosition += PositionsSpread * _tab.Securiti.PriceStep;
                     i--;
@@ -296,13 +303,18 @@ namespace OsEngine.Robots.MyBot
 
         private void TryOpenLongPositions()
         {
+            // получаем все открытые или открывающиеся позиции
             List<Position> positions = _tab.PositionsOpenAll;
-
             int curPosCount = positions.Count;
+
+            // цена, от которой будем выставлять сетку ордеров
+            // сетка ордеров на покупку выставляется ниже этой цены
             decimal curPricePosition = _tab.PriceBestBid;
 
+            // выставление сетки ордеров лимитными заявками
             for (int i = 0; i < MaxPositionsCount - curPosCount; i++)
             {
+                // если уже есть позиция с такой ценой, то не выставляем ордер
                 if (positions.Find(pos => pos.EntryPrice == curPricePosition) != null)
                 {
                     curPricePosition -= PositionsSpread * _tab.Securiti.PriceStep;
@@ -321,13 +333,16 @@ namespace OsEngine.Robots.MyBot
 
             for (int i = 0; i < positions.Count; i++)
             {
-                // проверяем, что позиция уже не закрывается
+                // если позиция уже закрывается, то ничего не делаем
                 if(positions[i].CloseActiv)
                 {
                     continue;
                 }
                 // выставляем лимитную заявку на закрытие позиции шорт (покупаем)
-                _tab.CloseAtLimit(positions[i], _tab.PriceBestAsk, positions[i].OpenVolume);
+                // дополнительно добавил проскальзывание
+                _tab.CloseAtLimit(positions[i], 
+                    _tab.PriceBestAsk + Slippage * _tab.Securiti.PriceStep,
+                    positions[i].OpenVolume);
             }
         }               
                         
@@ -344,7 +359,10 @@ namespace OsEngine.Robots.MyBot
                     continue;
                 }
                 // выставляем лимитную заявку на закрытие позиции лонг (продаем)
-                _tab.CloseAtLimit(positions[i], _tab.PriceBestBid, positions[i].OpenVolume);
+                // дополнительно добавил проскальзывание
+                _tab.CloseAtLimit(positions[i],
+                    _tab.PriceBestBid - Slippage * _tab.Securiti.PriceStep,
+                    positions[i].OpenVolume);
             }
         }
 
@@ -356,10 +374,10 @@ namespace OsEngine.Robots.MyBot
         private void CheckDistanceToOrder()
         {
             // минимально допустимая цена для открытия лонг позиции
-            decimal downLongPrice = _tab.PriceBestBid - MaxOrderDistance * _tab.Securiti.PriceStep;
+            decimal downPriceLong = _tab.PriceBestBid - MaxOrderDistance * _tab.Securiti.PriceStep;
 
             // максимально допустимая цена для открытия шорт позиции
-            decimal upShortPrice = _tab.PriceBestAsk + MaxOrderDistance * _tab.Securiti.PriceStep;
+            decimal upPriceShort = _tab.PriceBestAsk + MaxOrderDistance * _tab.Securiti.PriceStep;
             
             // получаем все открытые позиции
             List<Position> positions = _tab.PositionsOpenAll;
@@ -371,13 +389,13 @@ namespace OsEngine.Robots.MyBot
                     positions[i].OpenOrders[positions[i].OpenOrders.Count-1].VolumeExecute == 0)
                 {
                     if(positions[i].Direction == Side.Buy &&
-                        positions[i].OpenOrders[positions[i].OpenOrders.Count-1].Price < downLongPrice)
+                        positions[i].OpenOrders[positions[i].OpenOrders.Count-1].Price < downPriceLong)
                     {
                         _tab.CloseAllOrderToPosition(positions[i]);
                         continue;
                     }
                     else if (positions[i].Direction == Side.Sell &&
-                       positions[i].OpenOrders[positions[i].OpenOrders.Count - 1].Price > upShortPrice)
+                       positions[i].OpenOrders[positions[i].OpenOrders.Count - 1].Price > upPriceShort)
                     {
                         _tab.CloseAllOrderToPosition(positions[i]);
                         continue;
@@ -389,13 +407,13 @@ namespace OsEngine.Robots.MyBot
                     positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].VolumeExecute == 0)
                 {
                     if (positions[i].Direction == Side.Buy &&
-                       positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].Price > upShortPrice)
+                       positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].Price > upPriceShort)
                     {
                         _tab.CloseAllOrderToPosition(positions[i]);
                         continue;
                     }
                     else if (positions[i].Direction == Side.Sell &&
-                       positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].Price < downLongPrice)
+                       positions[i].CloseOrders[positions[i].CloseOrders.Count - 1].Price < downPriceLong)
                     {
                         _tab.CloseAllOrderToPosition(positions[i]);
                         continue;
