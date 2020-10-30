@@ -1,0 +1,29 @@
+﻿<Window x:Class="OsEngine.Robots.MyBot.SpatialArbitrageUi"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OsEngine.Robots.MyBot"
+        mc:Ignorable="d"
+        Title="SpatialArbitrageUi" Height="406" Width="409.877"
+        Style="{StaticResource WindowStyleNoResize}"
+        ResizeMode ="NoResize">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="265*"/>
+            <ColumnDefinition Width="36*"/>
+        </Grid.ColumnDefinitions>
+        <CheckBox x:Name="chbIsOn" Content="IsOn" HorizontalAlignment="Left" Margin="177,34,0,0" VerticalAlignment="Top"/>
+        <Label Content="Current profit" HorizontalAlignment="Left" Margin="75,75,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="txbCurrentProfit" HorizontalAlignment="Left" Margin="177,75,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Volume" HorizontalAlignment="Left" Margin="110,113,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="txbVolume" HorizontalAlignment="Left" Margin="177,113,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Min Profit" HorizontalAlignment="Left" Margin="96,154,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="txbMinProfit" HorizontalAlignment="Left" Margin="177,154,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Comission (%)" HorizontalAlignment="Left" Margin="72,194,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="txbComissionPct" HorizontalAlignment="Left" Margin="177,194,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Decimals" HorizontalAlignment="Left" Margin="101,239,0,0" VerticalAlignment="Top"/>
+        <TextBox x:Name="txbDecimals" HorizontalAlignment="Left" Margin="177,239,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Button x:Name="btnAccept1" Content="Accept" HorizontalAlignment="Left" Margin="177,309,0,0" VerticalAlignment="Top" Width="120" Click="btnAccept_Click"/>
+    </Grid>
+</Window>

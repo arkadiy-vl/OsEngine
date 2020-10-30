@@ -771,6 +771,10 @@
     <Compile Include="Robots\MyBot\PairArbitrageUi.xaml.cs">
       <DependentUpon>PairArbitrageUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Robots\MyBot\SpatialArbitrage.cs" />
+    <Compile Include="Robots\MyBot\SpatialArbitrageUi.xaml.cs">
+      <DependentUpon>SpatialArbitrageUi.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Robots\OnScriptIndicators\ArbitrageOneLeg.cs" />
     <Compile Include="Robots\OnScriptIndicators\BbPowerTrade.cs" />
     <Compile Include="Robots\OnScriptIndicators\BollingerRevers.cs" />
@@ -1270,6 +1274,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Robots\MyBot\PairArbitrageUi.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Robots\MyBot\SpatialArbitrageUi.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
