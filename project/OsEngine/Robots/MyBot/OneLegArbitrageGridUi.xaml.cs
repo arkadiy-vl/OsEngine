@@ -33,6 +33,20 @@ namespace OsEngine.Robots.MyBot
             txbMaxOrderDistance.Text = _bot.MaxOrderDistance.ToString();
             txbTradeTimePeriod.Text = _bot.TradeTimePeriod.ToString();
             txbSlippage.Text = _bot.Slippage.ToString();
+
+            // подписываемся на событие изменения фазы рынка для её вывода
+            _bot.MarketFazeChangeEvent += _bot_MarketFazeChangeEvent;
+        }
+
+        private void _bot_MarketFazeChangeEvent(MarketFaze marketFaze)
+        {
+            if (lblMarketFaze.Dispatcher.CheckAccess() == false)
+            {
+                lblMarketFaze.Dispatcher.Invoke(new Action<MarketFaze>(_bot_MarketFazeChangeEvent), marketFaze);
+                return;
+            }
+            
+            lblMarketFaze.Content = marketFaze.ToString();
         }
 
         private void BtnAccept_Click(object sender, RoutedEventArgs e)
@@ -54,7 +68,7 @@ namespace OsEngine.Robots.MyBot
             }
 
             _bot.Save();
-            Close();
+            //Close();
         }
     }
 }

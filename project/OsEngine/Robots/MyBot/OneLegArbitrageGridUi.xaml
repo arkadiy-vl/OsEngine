@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:OsEngine.Robots.MyBot"
         mc:Ignorable="d"
-        Title="Settings" Style="{StaticResource WindowStyleNoResize}" ResizeMode ="NoResize" Height="385.749" Width="422.5">
+        Title="Settings" Style="{StaticResource WindowStyleNoResize}" ResizeMode ="NoResize" Height="439.383" Width="422.5">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="241*"/>
@@ -23,9 +23,11 @@
         <Label Content="MaxOrderDistance" HorizontalAlignment="Left" Margin="57,178,0,0" VerticalAlignment="Top"/>
         <TextBox Name="txbTradeTimePeriod" HorizontalAlignment="Left" Margin="203,220,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Grid.ColumnSpan="3"/>
         <Label Content="TradeTimePeriod" HorizontalAlignment="Left" Margin="68,220,0,0" VerticalAlignment="Top"/>
-        <Button Name="btnAccept" Content="Accept" HorizontalAlignment="Left" Margin="203,303,0,0" VerticalAlignment="Top" Width="120" RenderTransformOrigin="0.747,0.6" Click="BtnAccept_Click" Grid.ColumnSpan="3"/>
-        <Label Content="Slippage (on close)" HorizontalAlignment="Left" Margin="68,260,0,0" VerticalAlignment="Top"/>
+        <Button Name="btnAccept" Content="Accept" HorizontalAlignment="Left" Margin="203,349,0,0" VerticalAlignment="Top" Width="120" RenderTransformOrigin="0.747,0.6" Click="BtnAccept_Click" Grid.ColumnSpan="3"/>
+        <Label Content="Slippage (on close)" HorizontalAlignment="Left" Margin="55,265,0,0" VerticalAlignment="Top"/>
         <TextBox x:Name="txbSlippage" HorizontalAlignment="Left" Margin="203,258,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Grid.ColumnSpan="3"/>
+        <Label Content="Market Faze:" HorizontalAlignment="Left" Margin="92,302,0,0" VerticalAlignment="Top"/>
+        <Label Name="lblMarketFaze" Content="" HorizontalAlignment="Left" Margin="203,302,0,0" VerticalAlignment="Top" Grid.ColumnSpan="3" Width="120" Foreground="White"/>
 
 
     </Grid>

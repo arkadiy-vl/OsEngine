@@ -17,12 +17,13 @@ namespace OsEngine.Robots.MyBot
 {
     /// <summary>
     /// Робот для одноногого арбитража относительно индекса из курса OsEngine - Арбитраж (c моими небольшими изменениями)
-    /// Робот торгует через заданные интервалы времени (10 сек), поэтому тестировать надо на тиковых данных
+    /// Робот торгует через заданные интервалы времени (10 сек), поэтому тестировать надо на тиковых данных.
     /// В данном роботе надо отключать сопровождение позиции, а в тестере надо выставлять большие значения на время отзыва ордеров.
     /// Входы, выходы при выходе спреда за границы канала, построенного от SMA спреда с помощью индикатора IvashovRange.
-    /// Робот выставляет сетку ордеров в соответствии с настройками
+    /// Робот выставляет сетку ордеров в соответствии с настройками и в зависимости от текущей фазы рынка.
+    /// Если индекс выше канала (фазы рынка "Upper"), то выставляем сетку ордеров на покупку инструмента.
+    /// Если индекс ниже канала (фазы рынка "Lower"), то выставляем сетку ордеров на продажу инструмента.
     /// Если ордер не исполнился и цена ушла от него, то ордер снимается.
-    /// 
     /// </summary>
     [Bot("OneLegArbitrageGrid")]
     public class OneLegArbitrageGrid : BotPanel
@@ -36,15 +37,16 @@ namespace OsEngine.Robots.MyBot
 
         // настроечные параметры робота
         public bool IsOn = false;                               // включение/выключение робота
-        public decimal Volume = 1;                              // объем входа
+        public decimal Volume = 0.01m;                          // объем входа
         public int MaxPositionsCount = 10;                      // максимальное количество позиций, которое может открыть робот
-        public int PositionsSpread = 10;                         // спред между открываемыми позициями
+        public int PositionsSpread = 10;                        // спред между открываемыми позициями
         public int MaxOrderDistance = 110;                      // максимальное расстояние от края стакана
         public int TradeTimePeriod = 10;                        // временной период торговли робота в секундах
         public int Slippage = 10;                               // проскальзывание, используется только при закрытии позиций
 
-        // последнее значение времени торговли робота
-        DateTime _lastTradeTime = DateTime.Now.AddYears(-10);
+        
+        DateTime _lastTradeTime = DateTime.Now.AddYears(-10);   // последнее значение времени торговли робота
+        private StartProgram _startProgram;                     // имя программы, которая запустила бота
 
         // вкладка для торговли и индекса
         BotTabSimple _tab;
@@ -59,9 +61,8 @@ namespace OsEngine.Robots.MyBot
         decimal _lastMA;
         decimal _lastIvashov;
 
-        // имя программы, которая запустила бота
-        private StartProgram _startProgram;
-
+        // событие изменение фазы рынка
+        public event Action<MarketFaze> MarketFazeChangeEvent;
         #endregion
 
         /// <summary>
@@ -126,7 +127,7 @@ namespace OsEngine.Robots.MyBot
         public override void ShowIndividualSettingsDialog()
         {
             OneLegArbitrageGridUi ui = new OneLegArbitrageGridUi(this);
-            ui.ShowDialog();
+            ui.Show();
         }
 
         /// <summary>
@@ -229,23 +230,26 @@ namespace OsEngine.Robots.MyBot
             }
             _lastTradeTime = time;
 
-            // проверяем, что робот включен, вкладка индекса и вкладка для торговли подключены
-            if (IsOn == false || _tabIndex.IsConnected == false || _tab.IsConnected == false)
+            // проверяем, что вкладка индекса и вкладка для торговли подключены
+            if (_tabIndex.IsConnected == false || _tab.IsConnected == false)
             {
                 return;
             }
 
+            // проверка на включение робота выполняется позже
+            // для возможности вывода текущей фазы рынка в окно настроечных параметров
+
             // проверяем наличие свечей в индексе и вкладке для торговли
             // и их достаточность для расчета индикаторов
             List<Candle> candlesIndex = _tabIndex.Candles;
-            //List<Candle> candlesTab = _tab.CandlesFinishedOnly;
+            List<Candle> candlesTab = _tab.CandlesFinishedOnly;
 
             if (candlesIndex == null ||
-
                 candlesIndex.Count < _ma.Lenght + 2 ||
                 candlesIndex.Count < _ivashov.LenghtMa + 30 ||
-                candlesIndex.Count < _ivashov.LenghtAverage + 30 /*||
-                candlesTab == null || candlesTab.Count < 1*/)
+                candlesIndex.Count < _ivashov.LenghtAverage + 30 ||
+                candlesTab == null ||
+                candlesTab.Count < 30)
             {
                 return;
             }
@@ -258,17 +262,36 @@ namespace OsEngine.Robots.MyBot
             // определяем текущую фазу рынка
             MarketFaze currentMarketFaze = GetMarketFaze();
 
-            if(currentMarketFaze == MarketFaze.Up)
+            // если кто-то подписан на событие изменения фазы рынка, то выдаем ему текущую фазу рынка           
+            if (MarketFazeChangeEvent != null)
             {
-                TryOpenShortPositions();
-                TryCloseLongPositions();
+                MarketFazeChangeEvent(currentMarketFaze);
             }
-            else if(currentMarketFaze == MarketFaze.Down)
+
+            // если фазы рынка не определилась, то ничего не делаем
+            if (currentMarketFaze == MarketFaze.Nothing)
+            {
+                return;
+            }
+
+            // проверяем, что робот включен
+            if (IsOn == false)
+            {
+                return;
+            }
+
+            // в зависимости от фазы рынка пробуем войти в позицию
+            if (currentMarketFaze == MarketFaze.Upper)
             {
                 TryOpenLongPositions();
                 TryCloseShortPositions();
             }
-            else if (currentMarketFaze == MarketFaze.Neutral)
+            else if(currentMarketFaze == MarketFaze.Lower)
+            {
+                TryOpenShortPositions();
+                TryCloseLongPositions();
+            }
+            else if (currentMarketFaze == MarketFaze.Up || currentMarketFaze == MarketFaze.Low)
             {
                 CheckClosingPositions();
             }
@@ -423,24 +446,38 @@ namespace OsEngine.Robots.MyBot
         }
 
         /// <summary>
-        /// Получить текущую фазу рынка (Up, Down, Neutral)
+        /// Получить текущую фазу рынка
         /// </summary>
         /// <returns></returns>
         private MarketFaze GetMarketFaze()
         {
-            MarketFaze currentMarketFaze = MarketFaze.Neutral;
+            MarketFaze currentMarketFaze = MarketFaze.Nothing;
 
+            // если индекс выше канала, то фазы рынка "Upper"
             if(_lastIndexPrice > _lastMA + _lastIvashov * Multiply.ValueDecimal)
+            {
+                currentMarketFaze = MarketFaze.Upper;
+            }
+            // если индекс выше средней, но ниже верхней границы канала, то фаза рынка "Up"
+            else if (_lastIndexPrice > _lastMA &&
+                     _lastIndexPrice <= _lastMA + _lastIvashov * Multiply.ValueDecimal)
             {
                 currentMarketFaze = MarketFaze.Up;
             }
+            // если индекс ниже средней, но выше нижней границы канала, то фаза рынка "Low"
+            else if (_lastIndexPrice <= _lastMA &&
+                     _lastIndexPrice >= _lastMA - _lastIvashov * Multiply.ValueDecimal)
+            {
+                currentMarketFaze = MarketFaze.Low;
+            }
+            // если индекс ниже канала, то фаза рынка "Lower"
             else if(_lastIndexPrice < _lastMA - _lastIvashov * Multiply.ValueDecimal)
             {
-                currentMarketFaze = MarketFaze.Down;
+                currentMarketFaze = MarketFaze.Lower;
             }
             else
             {
-                currentMarketFaze = MarketFaze.Neutral;
+                currentMarketFaze = MarketFaze.Nothing;
             }
 
             return currentMarketFaze;
@@ -451,9 +488,12 @@ namespace OsEngine.Robots.MyBot
     // Фаза рынка
     public enum MarketFaze
     {
+        Upper,
         Up,
-        Down,
-        Neutral
+        Low,
+        Lower,
+        Nothing
     }
 
 }
+

@@ -67,7 +67,6 @@ namespace OsEngine.Robots
             result.Add("CciTrade");
             result.Add("MacdRevers");
             result.Add("MacdTrail");
-            result.Add("OneLegArbitrage");
             result.Add("PairRsiTrade");
             result.Add("PriceChannelBreak");
             result.Add("PriceChannelVolatility");
@@ -151,10 +150,6 @@ namespace OsEngine.Robots
             if (nameClass == "MacdTrail")
             {
                 bot = new MacdTrail(name, startProgram);
-            }
-            if (nameClass == "OneLegArbitrage")
-            {
-                bot = new OneLegArbitrage(name, startProgram);
             }
             if (nameClass == "PairRsiTrade")
             {
@@ -264,7 +259,7 @@ namespace OsEngine.Robots
                 Type botType = BotsWithAttribute[nameClass];
                 bot = (BotPanel) Activator.CreateInstance(botType, name, startProgram);
             }
-            
+
             return bot;
         }
         

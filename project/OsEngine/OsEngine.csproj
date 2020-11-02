@@ -768,6 +768,10 @@
     <Compile Include="Robots\MyBot\OneLegArbitrageGridUi.xaml.cs">
       <DependentUpon>OneLegArbitrageGridUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Robots\MyBot\OneLegArbitrageMy.cs" />
+    <Compile Include="Robots\MyBot\OneLegArbitrageMyUi.xaml.cs">
+      <DependentUpon>OneLegArbitrageMyUi.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Robots\MyBot\PairArbitrageUi.xaml.cs">
       <DependentUpon>PairArbitrageUi.xaml</DependentUpon>
     </Compile>
@@ -775,16 +779,14 @@
     <Compile Include="Robots\MyBot\SpatialArbitrageUi.xaml.cs">
       <DependentUpon>SpatialArbitrageUi.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Robots\OnScriptIndicators\ArbitrageOneLeg.cs" />
     <Compile Include="Robots\OnScriptIndicators\BbPowerTrade.cs" />
     <Compile Include="Robots\OnScriptIndicators\BollingerRevers.cs" />
     <Compile Include="Robots\OnScriptIndicators\BollingerTrailing.cs" />
-    <Compile Include="Robots\OnScriptIndicators\BollingerTrend.cs" />
+    <Compile Include="Robots\MyBot\BollingerTrend.cs" />
     <Compile Include="Robots\OnScriptIndicators\CciTrade.cs" />
     <Compile Include="Robots\OnScriptIndicators\FundBalanceDivergenceBot.cs" />
     <Compile Include="Robots\OnScriptIndicators\MacdRevers.cs" />
     <Compile Include="Robots\OnScriptIndicators\MacdTrail.cs" />
-    <Compile Include="Robots\OnScriptIndicators\OneLegArbitrage.cs" />
     <Compile Include="Robots\MyBot\PairArbitrage.cs" />
     <Compile Include="Robots\OnScriptIndicators\PairRsiTrade.cs" />
     <Compile Include="Robots\OnScriptIndicators\PriceChannelBreak.cs" />
@@ -1270,6 +1272,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Robots\MyBot\OneLegArbitrageGridUi.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Robots\MyBot\OneLegArbitrageMyUi.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

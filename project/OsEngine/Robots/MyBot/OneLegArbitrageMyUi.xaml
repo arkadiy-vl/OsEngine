@@ -1,0 +1,41 @@
+﻿<Window x:Class="OneLegArbitrageMy.OneLegArbitrageMyUi"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:OneLegArbitrageMy"
+        mc:Ignorable="d"
+        Title="OneLegArbitrageMyUi"
+        Height="356.69"
+        Width="589.979"
+        Style="{StaticResource WindowStyleNoResize}"
+        ResizeMode ="NoResize">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="24*"/>
+            <ColumnDefinition Width="25*"/>
+        </Grid.ColumnDefinitions>
+        <CheckBox Name="chbIsOn" Content="Robot IsOn" HorizontalAlignment="Left" Margin="142,31,0,0" VerticalAlignment="Top" Width="120"/>
+        <CheckBox Name="chbOnFixedDeposit" Content="On fixed deposit" HorizontalAlignment="Left" Margin="142,25,0,0" VerticalAlignment="Top" Grid.Column="1" Width="120"/>
+        <Label Content="Fixed Volume" HorizontalAlignment="Left" Margin="45,72,0,0" VerticalAlignment="Top" Grid.Column="1" Width="85"/>
+        <TextBox Name="txbFixedVolume" HorizontalAlignment="Left" Margin="142,72,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Grid.Column="1"/>
+        <Label Content="Volume (% of depo)" HorizontalAlignment="Left" Margin="12,112,0,0" VerticalAlignment="Top" Width="118" Grid.Column="1"/>
+        <TextBox x:Name="txbVolumePct" HorizontalAlignment="Left" Margin="142,112,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Grid.Column="1"/>
+        <Label Content="Slippage" HorizontalAlignment="Left" Margin="72,202,0,0" VerticalAlignment="Top" Grid.Column="1" Width="58" RenderTransformOrigin="0.241,0.522"/>
+        <TextBox x:Name="txbSlippage" HorizontalAlignment="Left" Margin="142,202,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Grid.Column="1"/>
+        <Label Content="Decimals for volume" HorizontalAlignment="Left" Margin="5,156,0,0" VerticalAlignment="Top" Grid.Column="1" Width="125"/>
+        <TextBox x:Name="txbVolumeDecimals" HorizontalAlignment="Left" Margin="142,156,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120" Grid.Column="1"/>
+        <Label Content="Channel indicator" HorizontalAlignment="Left" Margin="21,72,0,0" VerticalAlignment="Top" Width="109"/>
+        <ComboBox Name="cmbChannelIndicator" HorizontalAlignment="Left" Margin="142,72,0,0" VerticalAlignment="Top" Width="120"/>
+        <Button Name="btnAccept" Content="Accept" HorizontalAlignment="Left" Margin="95,269,0,0" VerticalAlignment="Top" Width="120" Click="btnAccept_Click" Grid.Column="1"/>
+        <Label Content="Method of exit" HorizontalAlignment="Left" Margin="35,112,0,0" VerticalAlignment="Top" Width="95"/>
+        <ComboBox x:Name="cmbMethodOfExit" HorizontalAlignment="Left" Margin="142,112,0,0" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Max Position" HorizontalAlignment="Left" Margin="47,156,0,0" VerticalAlignment="Top" Width="83"/>
+        <TextBox x:Name="txbMaxPositionsCount" HorizontalAlignment="Left" Margin="142,156,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Deviation index&#xD;&#xA;for add enter" HorizontalAlignment="Left" Margin="31,200,0,0" VerticalAlignment="Top" Width="99" Height="43"/>
+        <TextBox x:Name="txbDeviationIndexForAddEnter" HorizontalAlignment="Left" Margin="142,202,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Market Faze" HorizontalAlignment="Left" Margin="47,271,0,0" VerticalAlignment="Top" Width="83" Height="22" RenderTransformOrigin="0.455,1.465"/>
+        <Label Name="lblMarketFaze" Content="Nothing" HorizontalAlignment="Left" Margin="142,272,0,0" VerticalAlignment="Top" Width="120" Height="22" RenderTransformOrigin="0.455,1.465" Foreground="White"/>
+
+    </Grid>
+</Window>
