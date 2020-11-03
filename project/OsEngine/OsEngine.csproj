@@ -60,6 +60,9 @@
   <PropertyGroup>
     <ApplicationIcon>Images\OsLogo.ico</ApplicationIcon>
   </PropertyGroup>
+  <PropertyGroup>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="cgate_net64, Version=5.2.1.21764, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
