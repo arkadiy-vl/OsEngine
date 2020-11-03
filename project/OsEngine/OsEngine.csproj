@@ -762,6 +762,23 @@
     <Compile Include="Robots\MarketMaker\PairTraderSimpleUi.xaml.cs">
       <DependentUpon>PairTraderSimpleUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Robots\MyBot\BollingerTrend.cs" />
+    <Compile Include="Robots\MyBot\OneLegArbitrageGrid.cs" />
+    <Compile Include="Robots\MyBot\OneLegArbitrageGridUi.xaml.cs">
+      <DependentUpon>OneLegArbitrageGridUi.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Robots\MyBot\OneLegArbitrageMy.cs" />
+    <Compile Include="Robots\MyBot\OneLegArbitrageMyUi.xaml.cs">
+      <DependentUpon>OneLegArbitrageMyUi.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Robots\MyBot\PairArbitrage.cs" />
+    <Compile Include="Robots\MyBot\PairArbitrageUi.xaml.cs">
+      <DependentUpon>PairArbitrageUi.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Robots\MyBot\SpatialArbitrage.cs" />
+    <Compile Include="Robots\MyBot\SpatialArbitrageUi.xaml.cs">
+      <DependentUpon>SpatialArbitrageUi.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Robots\OnScriptIndicators\BbPowerTrade.cs" />
     <Compile Include="Robots\OnScriptIndicators\BollingerRevers.cs" />
     <Compile Include="Robots\OnScriptIndicators\BollingerTrailing.cs" />
@@ -1252,6 +1269,22 @@
     <Page Include="Robots\MarketMaker\PairTraderSimpleUi.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Robots\MyBot\OneLegArbitrageGridUi.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Robots\MyBot\OneLegArbitrageMyUi.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Robots\MyBot\PairArbitrageUi.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Robots\MyBot\SpatialArbitrageUi.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="Robots\Trend\MomentumMacdUi.xaml">
       <SubType>Designer</SubType>
