@@ -762,6 +762,7 @@
     <Compile Include="Robots\MarketMaker\PairTraderSimpleUi.xaml.cs">
       <DependentUpon>PairTraderSimpleUi.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Robots\MyBot\AlligatorTrend.cs" />
     <Compile Include="Robots\MyBot\BollingerTrend.cs" />
     <Compile Include="Robots\MyBot\OneLegArbitrageGrid.cs" />
     <Compile Include="Robots\MyBot\OneLegArbitrageGridUi.xaml.cs">

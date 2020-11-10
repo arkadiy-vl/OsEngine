@@ -26,7 +26,7 @@ namespace OsEngine.Robots.MyBot
     // Размер входа либо фиксированный размер, либо процент от депозита.
 
     [Bot("BollingerTrend")]
-    class BollingerTrend : BotPanel
+    public class BollingerTrend : BotPanel
     {
         #region // Публичные настроечные параметры робота
 

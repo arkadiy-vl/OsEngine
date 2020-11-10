@@ -33,6 +33,7 @@ namespace OsEngine.Robots.MyBot
             txbMaxOrderDistance.Text = _bot.MaxOrderDistance.ToString();
             txbTradeTimePeriod.Text = _bot.TradeTimePeriod.ToString();
             txbSlippage.Text = _bot.Slippage.ToString();
+            lblPriceStep.Content = _bot.PriceStep;
 
             // подписываемся на событие изменения фазы рынка для её вывода
             _bot.MarketFazeChangeEvent += _bot_MarketFazeChangeEvent;

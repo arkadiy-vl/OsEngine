@@ -43,6 +43,7 @@ namespace OsEngine.Robots.MyBot
         public int MaxOrderDistance = 110;                      // максимальное расстояние от края стакана
         public int TradeTimePeriod = 10;                        // временной период торговли робота в секундах
         public int Slippage = 10;                               // проскальзывание, используется только при закрытии позиций
+        public decimal PriceStep = 0;                           // шаг цены
 
         
         DateTime _lastTradeTime = DateTime.Now.AddYears(-10);   // последнее значение времени торговли робота
@@ -81,7 +82,7 @@ namespace OsEngine.Robots.MyBot
             TabCreate(BotTabType.Index);
             _tab = TabsSimple[0];
             _tabIndex = TabsIndex[0];
-
+            
             // создаем оптимизируемые параметры
             LenghtMA = CreateParameter("LenghtMA", 60, 60, 200, 20);
             LenghtIvashovMA = CreateParameter("LenghtIvashovMA", 100, 60, 200, 20);
@@ -239,17 +240,22 @@ namespace OsEngine.Robots.MyBot
             // проверка на включение робота выполняется позже
             // для возможности вывода текущей фазы рынка в окно настроечных параметров
 
+            // сохраняем шаг цены для вывода в окно настроечных параметров
+            PriceStep = _tab.Securiti.PriceStep;
+
             // проверяем наличие свечей в индексе и вкладке для торговли
             // и их достаточность для расчета индикаторов
             List<Candle> candlesIndex = _tabIndex.Candles;
             List<Candle> candlesTab = _tab.CandlesFinishedOnly;
 
             if (candlesIndex == null ||
-                candlesIndex.Count < _ma.Lenght + 2 ||
+                candlesIndex.Count < _ma.Lenght + 30 ||
                 candlesIndex.Count < _ivashov.LenghtMa + 30 ||
                 candlesIndex.Count < _ivashov.LenghtAverage + 30 ||
                 candlesTab == null ||
-                candlesTab.Count < 30)
+                candlesTab.Count < _ma.Lenght + 30 ||
+                _ma.Values.Count < 30 ||
+                _ivashov.Values.Count < 30)
             {
                 return;
             }
